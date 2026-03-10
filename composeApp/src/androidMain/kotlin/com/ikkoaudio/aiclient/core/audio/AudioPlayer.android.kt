@@ -1,4 +1,4 @@
-package com.ikkoaudio.aiclient.platform.audio
+package com.ikkoaudio.aiclient.core.audio
 
 import android.media.AudioAttributes
 import android.media.AudioFormat
@@ -8,7 +8,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
-import java.util.UUID
 
 actual class PlatformAudioPlayer : AudioPlayer {
 

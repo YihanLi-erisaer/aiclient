@@ -1,4 +1,4 @@
-package com.ikkoaudio.aiclient.platform.audio
+package com.ikkoaudio.aiclient.core.audio
 
 /**
  * Platform-specific audio recording.

@@ -1,12 +1,12 @@
 package com.ikkoaudio.aiclient.presentation.chat
 
 import com.ikkoaudio.aiclient.data.repository.AiRepository
-import com.ikkoaudio.aiclient.platform.audio.AudioPlayer
-import com.ikkoaudio.aiclient.platform.audio.AudioRecorder
-import com.ikkoaudio.aiclient.platform.audio.PlatformAudioPlayer
-import com.ikkoaudio.aiclient.platform.audio.PlatformAudioRecorder
+import com.ikkoaudio.aiclient.core.audio.AudioPlayer
+import com.ikkoaudio.aiclient.core.audio.AudioRecorder
+import com.ikkoaudio.aiclient.core.audio.PlatformAudioPlayer
+import com.ikkoaudio.aiclient.core.audio.PlatformAudioRecorder
 import com.ikkoaudio.aiclient.data.local.SettingsStore
-import com.ikkoaudio.aiclient.platform.time.currentTimeMillis
+import com.ikkoaudio.aiclient.core.time.currentTimeMillis
 import co.touchlab.kermit.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job

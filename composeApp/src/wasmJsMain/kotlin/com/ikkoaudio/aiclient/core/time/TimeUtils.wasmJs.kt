@@ -1,4 +1,4 @@
-package com.ikkoaudio.aiclient.platform.time
+package com.ikkoaudio.aiclient.core.time
 
 import kotlin.js.ExperimentalWasmJsInterop
 import kotlin.js.js

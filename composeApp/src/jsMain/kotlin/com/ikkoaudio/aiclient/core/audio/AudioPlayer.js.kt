@@ -1,4 +1,4 @@
-package com.ikkoaudio.aiclient.platform.audio
+package com.ikkoaudio.aiclient.core.audio
 
 actual class PlatformAudioPlayer : AudioPlayer {
 

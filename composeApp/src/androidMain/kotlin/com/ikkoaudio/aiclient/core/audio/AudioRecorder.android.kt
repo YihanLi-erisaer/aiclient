@@ -1,11 +1,10 @@
-package com.ikkoaudio.aiclient.platform.audio
+package com.ikkoaudio.aiclient.core.audio
 
 import android.media.MediaRecorder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.io.FileInputStream
 import kotlin.coroutines.resume
 
 actual class PlatformAudioRecorder : AudioRecorder {
