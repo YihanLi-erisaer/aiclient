@@ -1,10 +1,9 @@
 package com.ikkoaudio.aiclient.di
 
-import com.ikkoaudio.aiclient.data.local.SettingsStore
 import com.ikkoaudio.aiclient.data.local.createSettingsStore
 import com.ikkoaudio.aiclient.data.remote.impl.KtorAiApi
 import com.ikkoaudio.aiclient.data.repository.AiRepository
-import com.ikkoaudio.aiclient.presentation.chat.ChatViewModel
+import com.ikkoaudio.aiclient.feature.chat.ChatViewModel
 import co.touchlab.kermit.Logger
 import kotlinx.coroutines.CoroutineScope
 

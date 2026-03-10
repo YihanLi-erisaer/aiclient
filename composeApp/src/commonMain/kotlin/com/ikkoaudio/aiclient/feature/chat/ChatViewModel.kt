@@ -1,4 +1,4 @@
-package com.ikkoaudio.aiclient.presentation.chat
+package com.ikkoaudio.aiclient.feature.chat
 
 import com.ikkoaudio.aiclient.data.repository.AiRepository
 import com.ikkoaudio.aiclient.core.audio.AudioPlayer
@@ -64,6 +64,7 @@ class ChatViewModel(
             ChatIntent.StopVoiceChat -> stopVoiceChat()
             ChatIntent.TextToSpeech -> textToSpeech()
             ChatIntent.ClearError -> _state.update { it.copy(error = null) }
+            is ChatIntent.SetError -> _state.update { it.copy(error = intent.message) }
             ChatIntent.OpenDrawer -> _state.update { it.copy(drawerOpen = true) }
             ChatIntent.CloseDrawer -> _state.update { it.copy(drawerOpen = false) }
             is ChatIntent.SelectPage -> _state.update {

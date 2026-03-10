@@ -1,4 +1,4 @@
-package com.ikkoaudio.aiclient.presentation.chat
+package com.ikkoaudio.aiclient.feature.chat
 
 import com.ikkoaudio.aiclient.domain.model.LlmModel
 

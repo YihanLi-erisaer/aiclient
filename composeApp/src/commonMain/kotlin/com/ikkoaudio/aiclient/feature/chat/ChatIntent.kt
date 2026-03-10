@@ -1,4 +1,4 @@
-package com.ikkoaudio.aiclient.presentation.chat
+package com.ikkoaudio.aiclient.feature.chat
 
  sealed class ChatIntent {
     data class SendMessage(val text: String) : ChatIntent()
@@ -15,6 +15,7 @@ package com.ikkoaudio.aiclient.presentation.chat
     object StopVoiceChat : ChatIntent()
     object TextToSpeech : ChatIntent()
     object ClearError : ChatIntent()
+    data class SetError(val message: String) : ChatIntent()
     object OpenDrawer : ChatIntent()
     object CloseDrawer : ChatIntent()
     data class SelectPage(val page: AppPage) : ChatIntent()

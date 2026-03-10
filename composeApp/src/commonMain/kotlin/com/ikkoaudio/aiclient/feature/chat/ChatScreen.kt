@@ -1,4 +1,4 @@
-package com.ikkoaudio.aiclient.presentation.chat
+package com.ikkoaudio.aiclient.feature.chat
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import com.ikkoaudio.aiclient.core.permission.requestRecordPermissionIfNeeded
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -212,8 +213,14 @@ private fun VoiceChatPage(state: ChatState, viewModel: ChatViewModel) {
             )
             Button(
                 onClick = {
-                    if (state.isRecording) viewModel.dispatch(ChatIntent.StopRecording)
-                    else viewModel.dispatch(ChatIntent.StartVoiceChat)
+                    if (state.isRecording) {
+                        viewModel.dispatch(ChatIntent.StopRecording)
+                    } else {
+                        requestRecordPermissionIfNeeded { granted ->
+                            if (granted) viewModel.dispatch(ChatIntent.StartVoiceChat)
+                            else viewModel.dispatch(ChatIntent.SetError("Microphone permission is required for recording"))
+                        }
+                    }
                 },
                 modifier = Modifier.size(120.dp),
                 shape = androidx.compose.foundation.shape.CircleShape,
@@ -317,8 +324,14 @@ private fun AsrPage(state: ChatState, viewModel: ChatViewModel) {
             if (state.isLoading) CircularProgressIndicator()
             Button(
                 onClick = {
-                    if (state.isRecording) viewModel.dispatch(ChatIntent.StopRecording)
-                    else viewModel.dispatch(ChatIntent.StartRecording)
+                    if (state.isRecording) {
+                        viewModel.dispatch(ChatIntent.StopRecording)
+                    } else {
+                        requestRecordPermissionIfNeeded { granted ->
+                            if (granted) viewModel.dispatch(ChatIntent.StartRecording)
+                            else viewModel.dispatch(ChatIntent.SetError("Microphone permission is required for recording"))
+                        }
+                    }
                 },
                 modifier = Modifier.size(120.dp),
                 shape = androidx.compose.foundation.shape.CircleShape,
