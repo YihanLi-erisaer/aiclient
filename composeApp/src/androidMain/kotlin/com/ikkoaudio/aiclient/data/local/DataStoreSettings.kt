@@ -13,7 +13,7 @@ class DataStoreSettings(private val dataStore: DataStore<Preferences>) : Setting
     companion object {
         private val API_BASE_URL = stringPreferencesKey("api_base_url")
         private val MEMORY_ID = stringPreferencesKey("memory_id")
-        private const val DEFAULT_BASE_URL = "http://prod-cn.your-api-server.com"
+        private const val DEFAULT_BASE_URL = "http://192.168.100.137:8080"
     }
 
     override fun getApiBaseUrl(): Flow<String> = dataStore.data.map { prefs ->

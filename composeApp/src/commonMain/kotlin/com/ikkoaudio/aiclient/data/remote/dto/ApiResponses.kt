@@ -11,7 +11,8 @@ data class TranscribeResponse(
 data class ChatResponse(
     val message: String? = null,
     val content: String? = null,
-    val response: String? = null
+    val response: String? = null,
+    val text: String? = null
 )
 
 @Serializable

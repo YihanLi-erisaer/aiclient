@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.random.Random
 
 class ChatViewModel(
     private val repository: AiRepository,
@@ -39,6 +40,9 @@ class ChatViewModel(
             settingsStore.getMemoryId().collect { id ->
                 _state.update { it.copy(memoryId = id) }
             }
+        }
+        scope.launch {
+            ensureMemoryId()
         }
     }
 
@@ -76,6 +80,7 @@ class ChatViewModel(
     private fun sendMessage(text: String) {
         if (text.isBlank()) return
         val msg = text.trim()
+        logger.i { "sendMessage triggered, textLength=${msg.length}, page=${_state.value.selectedPage}" }
         _state.update {
             it.copy(
                 inputText = "",
@@ -87,8 +92,9 @@ class ChatViewModel(
         streamJob?.cancel()
         streamJob = scope.launch {
             val baseUrl = _state.value.apiBaseUrl
-            val memoryId = _state.value.memoryId
+            val memoryId = ensureMemoryId()
             val assistantId = "a-${currentTimeMillis()}"
+            logger.i { "LLM stream start, baseUrl=$baseUrl, memoryId=$memoryId" }
             _state.update { it.copy(isStreaming = true, isLoading = false) }
             _state.update {
                 it.copy(messages = it.messages + ChatMessageUi(assistantId, "assistant", "", true))
@@ -199,15 +205,19 @@ class ChatViewModel(
                 return@launch
             }
             _state.update { it.copy(isLoading = true, error = null) }
-            repository.asrLlmTtsChat(_state.value.apiBaseUrl, bytes, "recording.m4a", _state.value.memoryId)
-                .onSuccess { audioBytes ->
-                    _state.update { it.copy(isLoading = false) }
-                    audioPlayer.play(audioBytes)
-                }
-                .onFailure { err ->
-                    logger.e { "Voice chat failed: ${err.message}" }
-                    _state.update { it.copy(error = err.message, isLoading = false) }
-                }
+            val memoryId = ensureMemoryId()
+            val combinedResult =
+                repository.asrLlmTtsChat(_state.value.apiBaseUrl, bytes, "recording.wav", memoryId)
+            if (combinedResult.isSuccess) {
+                val audioBytes = combinedResult.getOrThrow()
+                _state.update { it.copy(isLoading = false) }
+                audioPlayer.play(audioBytes)
+                return@launch
+            }
+
+            val err = combinedResult.exceptionOrNull()
+            logger.e { "Voice chat failed: ${err?.message}" }
+            _state.update { it.copy(error = err?.message ?: "Voice chat failed", isLoading = false) }
         }
     }
 
@@ -224,7 +234,7 @@ class ChatViewModel(
                 return@launch
             }
             _state.update { it.copy(isLoading = true, error = null) }
-            repository.transcribeAudio(_state.value.apiBaseUrl, bytes, "recording.m4a")
+            repository.transcribeAudio(_state.value.apiBaseUrl, bytes, "recording.wav")
                 .onSuccess { text ->
                     _state.update {
                         it.copy(
@@ -255,6 +265,17 @@ class ChatViewModel(
                     _state.update { it.copy(error = err.message, isLoading = false) }
                 }
         }
+    }
+
+    private suspend fun ensureMemoryId(): String {
+        val inState = _state.value.memoryId?.trim().orEmpty()
+        if (inState.isNotEmpty()) return inState
+
+        val generated = "mem-${currentTimeMillis()}-${Random.nextInt(100000, 999999)}"
+        settingsStore.setMemoryId(generated)
+        _state.update { it.copy(memoryId = generated) }
+        logger.i { "Generated new memoryId: $generated" }
+        return generated
     }
 
 }

@@ -34,6 +34,7 @@ kotlin {
             implementation(libs.androidx.activity.compose)
             implementation(libs.androidx.datastore.preferences)
             implementation(libs.ktor.client.okhttp)
+            implementation(libs.slf4j.android)
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)
