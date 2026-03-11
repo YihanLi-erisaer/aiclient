@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.flowOf
 
 class InMemorySettingsStore : SettingsStore {
 
-    private val baseUrl = MutableStateFlow("http://prod-cn.your-api-server.com")
+    private val baseUrl = MutableStateFlow("http://192.168.100.183:8080")
     private val memoryId = MutableStateFlow<String?>(null)
 
     override fun getApiBaseUrl(): Flow<String> = baseUrl
