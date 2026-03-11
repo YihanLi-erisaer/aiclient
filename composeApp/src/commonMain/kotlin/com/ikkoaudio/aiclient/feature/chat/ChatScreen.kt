@@ -35,7 +35,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                 )
                 HorizontalDivider()
                 NavigationDrawerItem(
-                    icon = { Text("🎤") },
+                    // icon = { Text("🎤") },
                     label = { Text("Voice Chat") },
                     selected = state.selectedPage == AppPage.VOICECHAT,
                     onClick = {
@@ -43,19 +43,19 @@ fun ChatScreen(viewModel: ChatViewModel) {
                     }
                 )
                 NavigationDrawerItem(
-                    icon = { Text("💬") },
+                    // icon = { Text("💬") },
                     label = { Text("LLM") },
                     selected = state.selectedPage == AppPage.LLM,
                     onClick = { viewModel.dispatch(ChatIntent.SelectPage(AppPage.LLM)) }
                 )
                 NavigationDrawerItem(
-                    icon = { Text("🔊") },
+                    // icon = { Text("🔊") },
                     label = { Text("TTS") },
                     selected = state.selectedPage == AppPage.TTS,
                     onClick = { viewModel.dispatch(ChatIntent.SelectPage(AppPage.TTS)) }
                 )
                 NavigationDrawerItem(
-                    icon = { Text("📝") },
+                    // icon = { Text("📝") },
                     label = { Text("ASR") },
                     selected = state.selectedPage == AppPage.ASR,
                     onClick = { viewModel.dispatch(ChatIntent.SelectPage(AppPage.ASR)) }

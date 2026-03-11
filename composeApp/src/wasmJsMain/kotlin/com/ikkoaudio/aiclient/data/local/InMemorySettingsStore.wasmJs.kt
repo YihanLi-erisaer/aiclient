@@ -5,7 +5,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 
 class InMemorySettingsStore : SettingsStore {
 
-    private val baseUrl = MutableStateFlow("http://prod-cn.your-api-server.com")
+    // Use relative URL in browser so webpack proxy can forward /api/* and avoid CORS.
+    private val baseUrl = MutableStateFlow("/")
     private val memoryId = MutableStateFlow<String?>(null)
 
     override fun getApiBaseUrl(): Flow<String> = baseUrl
