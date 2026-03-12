@@ -12,7 +12,7 @@ class InMemorySettingsStore : SettingsStore {
     override fun getApiBaseUrl(): Flow<String> = baseUrl
 
     override suspend fun setApiBaseUrl(url: String) {
-        baseUrl.value = url
+        // API URL is developer-only; users cannot change it
     }
 
     override fun getMemoryId(): Flow<String?> = memoryId

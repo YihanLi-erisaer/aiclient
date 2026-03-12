@@ -5,7 +5,6 @@ package com.ikkoaudio.aiclient.feature.chat
     data class UpdateInput(val text: String) : ChatIntent()
     object LoadModels : ChatIntent()
     data class SelectModel(val model: String) : ChatIntent()
-    data class SetApiBaseUrl(val url: String) : ChatIntent()
     data class SetMemoryId(val id: String?) : ChatIntent()
     data class SendAudioFile(val bytes: ByteArray, val fileName: String) : ChatIntent()
     data class SendImage(val bytes: ByteArray, val fileName: String, val message: String) : ChatIntent()

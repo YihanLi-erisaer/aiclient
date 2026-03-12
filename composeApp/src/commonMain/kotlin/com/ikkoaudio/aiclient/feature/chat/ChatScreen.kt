@@ -58,11 +58,9 @@ fun ChatScreen(viewModel: ChatViewModel) {
                 Spacer(modifier = Modifier.weight(1f))
                 HorizontalDivider()
                 SettingsDrawerSection(
-                    apiBaseUrl = state.apiBaseUrl,
                     memoryId = state.memoryId,
                     models = state.models,
                     selectedModel = state.selectedModel,
-                    onApiUrlChange = { viewModel.dispatch(ChatIntent.SetApiBaseUrl(it)) },
                     onMemoryIdChange = { viewModel.dispatch(ChatIntent.SetMemoryId(it)) },
                     onModelSelect = { viewModel.dispatch(ChatIntent.SelectModel(it)) },
                     onLoadModels = { viewModel.dispatch(ChatIntent.LoadModels) }
@@ -131,11 +129,9 @@ fun ChatScreen(viewModel: ChatViewModel) {
 
 @Composable
 private fun SettingsDrawerSection(
-    apiBaseUrl: String,
     memoryId: String?,
     models: List<com.ikkoaudio.aiclient.domain.model.LlmModel>,
     selectedModel: String?,
-    onApiUrlChange: (String) -> Unit,
     onMemoryIdChange: (String?) -> Unit,
     onModelSelect: (String) -> Unit,
     onLoadModels: () -> Unit
@@ -154,13 +150,6 @@ private fun SettingsDrawerSection(
     }
     if (expanded) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-            OutlinedTextField(
-                value = apiBaseUrl,
-                onValueChange = onApiUrlChange,
-                label = { Text("API URL") },
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(modifier = Modifier.height(8.dp))
             OutlinedTextField(
                 value = memoryId ?: "",
                 onValueChange = { onMemoryIdChange(it.ifEmpty { null }) },

@@ -52,10 +52,6 @@ class ChatViewModel(
             is ChatIntent.UpdateInput -> _state.update { it.copy(inputText = intent.text) }
             ChatIntent.LoadModels -> loadModels()
             is ChatIntent.SelectModel -> _state.update { it.copy(selectedModel = intent.model) }
-            is ChatIntent.SetApiBaseUrl -> scope.launch {
-                settingsStore.setApiBaseUrl(intent.url)
-                _state.update { it.copy(apiBaseUrl = intent.url) }
-            }
             is ChatIntent.SetMemoryId -> scope.launch {
                 settingsStore.setMemoryId(intent.id)
                 _state.update { it.copy(memoryId = intent.id) }
