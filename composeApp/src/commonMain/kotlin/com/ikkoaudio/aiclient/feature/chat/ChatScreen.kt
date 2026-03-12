@@ -2,6 +2,12 @@ package com.ikkoaudio.aiclient.feature.chat
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Chat
+import androidx.compose.material.icons.automirrored.outlined.VolumeUp
+import androidx.compose.material.icons.outlined.KeyboardVoice
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshotFlow
@@ -30,7 +36,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                 )
                 HorizontalDivider()
                 NavigationDrawerItem(
-                    // icon = { Text("🎤") },
+                    icon = { Icon(Icons.Outlined.Mic, contentDescription = null) },
                     label = { Text("Voice Chat") },
                     selected = state.selectedPage == AppPage.VOICECHAT,
                     onClick = {
@@ -38,19 +44,19 @@ fun ChatScreen(viewModel: ChatViewModel) {
                     }
                 )
                 NavigationDrawerItem(
-                    // icon = { Text("💬") },
+                    icon = { Icon(Icons.AutoMirrored.Outlined.Chat, contentDescription = null) },
                     label = { Text("LLM") },
                     selected = state.selectedPage == AppPage.LLM,
                     onClick = { viewModel.dispatch(ChatIntent.SelectPage(AppPage.LLM)) }
                 )
                 NavigationDrawerItem(
-                    // icon = { Text("🔊") },
+                    icon = { Icon(Icons.AutoMirrored.Outlined.VolumeUp, contentDescription = null) },
                     label = { Text("TTS") },
                     selected = state.selectedPage == AppPage.TTS,
                     onClick = { viewModel.dispatch(ChatIntent.SelectPage(AppPage.TTS)) }
                 )
                 NavigationDrawerItem(
-                    // icon = { Text("📝") },
+                    icon = { Icon(Icons.Outlined.KeyboardVoice, contentDescription = null) },
                     label = { Text("ASR") },
                     selected = state.selectedPage == AppPage.ASR,
                     onClick = { viewModel.dispatch(ChatIntent.SelectPage(AppPage.ASR)) }
@@ -89,7 +95,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                 else viewModel.dispatch(ChatIntent.OpenDrawer)
                             }
                         ) {
-                            Text("≡", style = MaterialTheme.typography.headlineMedium)
+                            Icon(Icons.Filled.Menu, contentDescription = "Menu")
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
