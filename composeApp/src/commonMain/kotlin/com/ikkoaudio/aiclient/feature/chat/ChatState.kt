@@ -18,7 +18,7 @@ data class ChatState(
     val models: List<LlmModel> = emptyList(),
     val selectedModel: String? = null,
     val memoryId: String? = null,
-    val apiBaseUrl: String = "http://prod-cn.your-api-server.com",
+    val apiBaseUrl: String = "http://192.168.100.137:8080",
     val isRecording: Boolean = false,
     val isVoiceChat: Boolean = false,  // true = full ASR->LLM->TTS pipeline
     val selectedPage: AppPage = AppPage.VOICECHAT,
