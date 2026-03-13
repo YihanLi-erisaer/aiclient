@@ -21,6 +21,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import com.mikepenz.markdown.m3.Markdown
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -71,11 +72,19 @@ private fun MessageBubble(role: String, content: String, isStreaming: Boolean) {
             color = if (isUser) MaterialTheme.colorScheme.primaryContainer
             else MaterialTheme.colorScheme.surfaceVariant
         ) {
-            Text(
-                text = content.ifEmpty { if (isStreaming) "..." else "" },
-                modifier = Modifier.padding(12.dp),
-                style = MaterialTheme.typography.bodyLarge
-            )
+            val displayContent = content.ifEmpty { if (isStreaming) "..." else "" }
+            if (isUser) {
+                Text(
+                    text = displayContent,
+                    modifier = Modifier.padding(12.dp),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            } else {
+                Markdown(
+                    content = displayContent,
+                    modifier = Modifier.padding(12.dp)
+                )
+            }
         }
     }
 }
