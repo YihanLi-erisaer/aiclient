@@ -98,6 +98,11 @@ class ChatViewModel(
             var fullResponse = ""
             repository.chatStream(baseUrl, memoryId, msg).collect { result ->
                 result.onSuccess { chunk ->
+                    if (fullResponse.isNotEmpty() && chunk.isNotEmpty() &&
+                        shouldAddSpaceBetweenChunks(fullResponse, chunk)
+                    ) {
+                        fullResponse += " "
+                    }
                     fullResponse += chunk
                     _state.update { state ->
                         state.copy(
@@ -122,6 +127,20 @@ class ChatViewModel(
                 )
             }
         }
+    }
+
+    /**
+     * Returns true when a space should be inserted between two chunks during streaming.
+     * Adds space between English words (e.g. "Hello" + "world" -> "Hello world")
+     * but NOT between digits (25) or inside URLs (runoob.com).
+     */
+    private fun shouldAddSpaceBetweenChunks(prev: String, next: String): Boolean {
+        val last = prev.last()
+        val first = next.first()
+        val isLatinLetter = { c: Char -> c in 'a'..'z' || c in 'A'..'Z' }
+        if (!isLatinLetter(last) || !isLatinLetter(first)) return false // Excludes digits
+        val inUrlContext = prev.contains("http://") || prev.contains("https://") || prev.contains("www.")
+        return !inUrlContext
     }
 
     private fun loadModels() {

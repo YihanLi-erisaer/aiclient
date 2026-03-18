@@ -32,10 +32,11 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 /**
  * Renders markdown-like content using AnnotatedString for reliable cross-platform display.
- * Handles **bold**, ***bold+italic***, *italic*, `inline code`, ```code blocks```, [links](url), and normalizes LLM output.
+ * Handles # headers, **bold**, ***bold+italic***, *italic*, `inline code`, ```code blocks```, [links](url).
  */
 @Composable
 private fun MarkdownText(
@@ -68,6 +69,10 @@ private fun normalizeMarkdownForRendering(content: String): String {
         .replace(Regex("""\]\([^)]+\)\]""")) { it.value.dropLast(1) }
         // Fix code block: ``` python -> ```python
         .replace(Regex("""```[ \t]+"""), "```")
+        // Fix header: #标题 -> # 标题 (need space after # for Markdown)
+        .replace(Regex("""(^|\n)(#{1,6})([^\s\n#][^\n]*)""")) { mr ->
+            mr.groupValues[1] + mr.groupValues[2] + " " + mr.groupValues[3]
+        }
 }
 
 /** Splits single-line code into multiple lines when LLM outputs code without newlines. */
@@ -87,6 +92,33 @@ private fun buildMarkdownAnnotatedString(content: String, linkColor: Color = Col
     val len = content.length
     while (i < len) {
         when {
+            // Markdown header # ## ### (at line start only)
+            (i == 0 || content.getOrNull(i - 1) == '\n') && content.getOrNull(i) == '#' -> {
+                var hashCount = 0
+                var j = i
+                while (j < len && content[j] == '#' && hashCount < 6) {
+                    hashCount++
+                    j++
+                }
+                if (hashCount > 0 && j < len && content[j] in " \t") {
+                    val afterSpace = content.indexOf('\n', j).takeIf { it != -1 } ?: len
+                    val headerText = content.substring(j, afterSpace).trimStart()
+                    val fontSize = when (hashCount) {
+                        1 -> 22.sp
+                        2 -> 20.sp
+                        3 -> 18.sp
+                        else -> 16.sp
+                    }
+                    pushStyle(SpanStyle(fontWeight = FontWeight.Bold, fontSize = fontSize))
+                    append(buildMarkdownAnnotatedString(headerText, linkColor))
+                    pop()
+                    if (afterSpace < len) append("\n")
+                    i = afterSpace
+                } else {
+                    append(content[i])
+                    i += 1
+                }
+            }
             // Link [text](url) - must check before other patterns
             content.getOrNull(i) == '[' -> {
                 val closeBracket = content.indexOf(']', i + 1)
