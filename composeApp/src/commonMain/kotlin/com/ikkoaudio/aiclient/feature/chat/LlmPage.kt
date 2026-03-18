@@ -40,7 +40,7 @@ fun LlmPage(state: ChatState, viewModel: ChatViewModel) {
             verticalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding = PaddingValues(16.dp)
         ) {
-            items(state.messages) { msg ->
+            items(state.messages, key = { it.id }) { msg ->
                 MessageBubble(role = msg.role, content = msg.content, isStreaming = msg.isStreaming)
             }
             if (state.isLoading && state.messages.none { it.isStreaming }) {
@@ -74,6 +74,13 @@ private fun MessageBubble(role: String, content: String, isStreaming: Boolean) {
         ) {
             val displayContent = content.ifEmpty { if (isStreaming) "..." else "" }
             if (isUser) {
+                Text(
+                    text = displayContent,
+                    modifier = Modifier.padding(12.dp),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            } else if (isStreaming) {
+                // Use Text during streaming to avoid Markdown re-parsing on every chunk
                 Text(
                     text = displayContent,
                     modifier = Modifier.padding(12.dp),
