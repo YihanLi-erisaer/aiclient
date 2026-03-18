@@ -98,9 +98,6 @@ class ChatViewModel(
             var fullResponse = ""
             repository.chatStream(baseUrl, memoryId, msg).collect { result ->
                 result.onSuccess { chunk ->
-                    if (fullResponse.isNotEmpty() && chunk.isNotEmpty() && needsSpaceBetweenEnglishWords(fullResponse.last(), chunk.first())) {
-                        fullResponse += " "
-                    }
                     fullResponse += chunk
                     _state.update { state ->
                         state.copy(
@@ -125,16 +122,6 @@ class ChatViewModel(
                 )
             }
         }
-    }
-
-    /**
-     * Returns true when a space should be inserted between two adjacent English word characters.
-     * Used when the API streams word-by-word without spaces. Only applies to Latin letters/digits
-     * so we don't add spaces between Chinese or other CJK characters.
-     */
-    private fun needsSpaceBetweenEnglishWords(prev: Char, next: Char): Boolean {
-        fun isLatinWordChar(c: Char) = c in 'a'..'z' || c in 'A'..'Z' || c in '0'..'9'
-        return isLatinWordChar(prev) && isLatinWordChar(next)
     }
 
     private fun loadModels() {
