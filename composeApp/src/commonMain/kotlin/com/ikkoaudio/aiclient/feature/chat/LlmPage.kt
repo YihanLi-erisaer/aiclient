@@ -14,13 +14,17 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -34,10 +38,162 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/**
- * Renders markdown-like content using AnnotatedString for reliable cross-platform display.
- * Handles # headers, **bold**, ***bold+italic***, *italic*, `inline code`, ```code blocks```, [links](url).
- */
+private sealed class MarkdownBlock {
+    data class Paragraph(val text: String) : MarkdownBlock()
+    data class CodeBlock(val code: String) : MarkdownBlock()
+    data class Table(val rows: List<List<String>>) : MarkdownBlock()
+    object HorizontalRule : MarkdownBlock()
+}
+
+private fun parseMarkdownBlocks(content: String): List<MarkdownBlock> {
+    val normalized = normalizeMarkdownForRendering(content)
+    val lines = normalized.split("\n")
+    val blocks = mutableListOf<MarkdownBlock>()
+    var i = 0
+    while (i < lines.size) {
+        val line = lines[i]
+        when {
+            line.matches(Regex("""^[-*_]{3,}\s*\$""")) -> {
+                blocks.add(MarkdownBlock.HorizontalRule)
+                i++
+            }
+            line.trim().startsWith("```") -> {
+                val lang = line.trim().removePrefix("```").trim()
+                val codeLines = mutableListOf<String>()
+                i++
+                while (i < lines.size && !lines[i].trim().startsWith("```")) {
+                    codeLines.add(lines[i])
+                    i++
+                }
+                if (i < lines.size) i++
+                blocks.add(MarkdownBlock.CodeBlock(formatCodeBlockForReadability(codeLines.joinToString("\n").trimEnd())))
+            }
+            line.contains("|") && line.trim().startsWith("|") -> {
+                val tableRows = mutableListOf<List<String>>()
+                while (i < lines.size && lines[i].contains("|")) {
+                    val row = lines[i]
+                    val cells = row.split("|").map { it.trim() }.filter { it.isNotEmpty() }
+                    val isSeparator = cells.isNotEmpty() && cells.all { it.matches(Regex("""^[-:\s]+$""")) }
+                    if (!isSeparator && cells.isNotEmpty()) {
+                        tableRows.add(cells)
+                    }
+                    i++
+                }
+                if (tableRows.isNotEmpty()) {
+                    blocks.add(MarkdownBlock.Table(tableRows))
+                }
+            }
+            else -> {
+                val paraLines = mutableListOf<String>()
+                while (i < lines.size) {
+                    val l = lines[i]
+                    val isTableRow = l.contains("|") && l.trim().startsWith("|")
+                    if (l.matches(Regex("""^[-*_]{3,}\s*\$""")) ||
+                        l.trim().startsWith("```") ||
+                        isTableRow) break
+                    paraLines.add(l)
+                    i++
+                }
+                val para = paraLines.joinToString("\n").trim()
+                if (para.isNotEmpty()) {
+                    blocks.add(MarkdownBlock.Paragraph(para))
+                }
+            }
+        }
+    }
+    return blocks
+}
+
+/** Renders markdown with block support: tables, horizontal rules, headers, etc. */
+@Composable
+private fun MarkdownContent(
+    content: String,
+    modifier: Modifier = Modifier,
+    linkColor: Color = MaterialTheme.colorScheme.primary
+) {
+    val blocks = remember(content) { parseMarkdownBlocks(content) }
+    val textColor = MaterialTheme.colorScheme.onSurfaceVariant
+    Column(modifier = modifier) {
+        blocks.forEach { block ->
+            when (block) {
+                is MarkdownBlock.Paragraph -> {
+                    val annotated = buildMarkdownAnnotatedString(block.text, linkColor)
+                    Text(
+                        text = annotated,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = textColor,
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    )
+                }
+                is MarkdownBlock.CodeBlock -> {
+                    Text(
+                        text = block.code,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontFamily = FontFamily.Monospace,
+                        color = textColor,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                }
+                is MarkdownBlock.Table -> {
+                    val rows = block.rows
+                    if (rows.isNotEmpty()) {
+                        val colCount = rows.maxOfOrNull { it.size } ?: 1
+                        Column(
+                            modifier = Modifier
+                                .padding(vertical = 8.dp)
+                                .padding(bottom = 12.dp)
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surface)
+                        ) {
+                            rows.forEachIndexed { rowIdx, cells ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp, horizontal = 8.dp),
+                                    horizontalArrangement = Arrangement.Start,
+                                    verticalAlignment = Alignment.Top
+                                ) {
+                                    cells.forEachIndexed { colIdx, cell ->
+                                        Box(
+                                            modifier = Modifier.weight(1f),
+                                            contentAlignment = Alignment.CenterStart
+                                        ) {
+                                            Text(
+                                                text = buildMarkdownAnnotatedString(cell, linkColor),
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontFamily = FontFamily.Monospace,
+                                                fontWeight = if (rowIdx == 0) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (rowIdx == 0) {
+                                                    MaterialTheme.colorScheme.primary
+                                                } else textColor
+                                            )
+                                        }
+                                    }
+                                    (cells.size until colCount).forEach { _ ->
+                                        Box(modifier = Modifier.weight(1f))
+                                    }
+                                }
+                                if (rowIdx == 0) {
+                                    HorizontalDivider(
+                                        color = MaterialTheme.colorScheme.outlineVariant,
+                                        thickness = 1.dp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                is MarkdownBlock.HorizontalRule -> {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun MarkdownText(
     content: String,
@@ -57,6 +213,7 @@ private fun MarkdownText(
 
 private fun normalizeMarkdownForRendering(content: String): String {
     return content
+        .replace(Regex("""<br\s*/?>""", RegexOption.IGNORE_CASE), "\n")
         .replace(Regex("""\*\*\*\s+"""), "***")
         .replace(Regex("""\s+\*\*\*"""), "***")
         .replace(Regex("""\*\*\s+"""), "**")
@@ -289,7 +446,7 @@ private fun MessageBubble(role: String, content: String, isStreaming: Boolean) {
                     style = MaterialTheme.typography.bodyLarge
                 )
             } else {
-                MarkdownText(
+                MarkdownContent(
                     content = displayContent,
                     modifier = Modifier.fillMaxWidth().padding(12.dp)
                 )

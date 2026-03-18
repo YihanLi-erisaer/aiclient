@@ -19,7 +19,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -106,7 +106,10 @@ class KtorAiApi(
                     if (chunk.startsWith("data:")) {
                         val data = chunk.removePrefix("data:").trim()
                         if (data != "[DONE]" && data.isNotBlank()) {
-                            trySend(Result.success(data))
+                            val content = extractStreamContent(data)
+                            if (content.isNotEmpty()) {
+                                trySend(Result.success(content))
+                            }
                         }
                     } else if (chunk.isNotBlank()) {
                         // Fallback for non-SSE stream implementations that return plain text lines.
@@ -291,6 +294,22 @@ class KtorAiApi(
             }
         }
         throw IllegalStateException("ASR_LLM_TTS did not return audio or audio url: ${trimmed.take(160)}")
+    }
+
+    /**
+     * Extracts text content from SSE stream data. Handles both plain text and JSON
+     * (OpenAI-style: {"choices":[{"delta":{"content":"..."}}]}). Preserves newlines
+     * that may be in the content.
+     */
+    private fun extractStreamContent(data: String): String {
+        if (!data.startsWith("{")) return data
+        return runCatching {
+            val root = Json.parseToJsonElement(data).jsonObject
+            val content = root["choices"]?.jsonArray?.getOrNull(0)?.jsonObject
+                ?.get("delta")?.jsonObject?.get("content")?.jsonPrimitive?.content
+                ?: root["content"]?.jsonPrimitive?.content
+            content ?: data
+        }.getOrElse { data }
     }
 
     private fun parseChatResponse(body: String): String {

@@ -98,10 +98,11 @@ class ChatViewModel(
             var fullResponse = ""
             repository.chatStream(baseUrl, memoryId, msg).collect { result ->
                 result.onSuccess { chunk ->
-                    if (fullResponse.isNotEmpty() && chunk.isNotEmpty() &&
-                        shouldAddSpaceBetweenChunks(fullResponse, chunk)
-                    ) {
-                        fullResponse += " "
+                    if (fullResponse.isNotEmpty() && chunk.isNotEmpty()) {
+                        when {
+                            shouldAddNewlineBetweenChunks(fullResponse, chunk) -> fullResponse += "\n"
+                            shouldAddSpaceBetweenChunks(fullResponse, chunk) -> fullResponse += " "
+                        }
                     }
                     fullResponse += chunk
                     _state.update { state ->
@@ -130,15 +131,41 @@ class ChatViewModel(
     }
 
     /**
+     * Returns true when a newline should be inserted between two chunks during streaming.
+     * SSE readUTF8Line() consumes newlines between events, so we restore them when the
+     * chunk appears to be a new line (table row, header, code block, etc.).
+     */
+    private fun shouldAddNewlineBetweenChunks(prev: String, next: String): Boolean {
+        val nextTrim = next.trimStart()
+        return when {
+            // Table row boundary: prev ends with | and next starts with | (handles single "|" causing "||")
+            prev.endsWith("|") && (next.startsWith("|") || nextTrim.startsWith("|")) -> true
+            // Table row or separator: next looks like table content
+            (next.startsWith("|") && next.length >= 2) || (nextTrim.startsWith("|") && nextTrim.length >= 2) -> true
+            // New section after table: prev is full row (has multiple |), next starts new paragraph (e.g. 总结:)
+            prev.endsWith("|") && prev.indexOf('|', 1) >= 0 &&
+                (next.startsWith("总") || next.trimStart().startsWith("总")) -> true
+            // Header, code block, horizontal rule
+            next.startsWith("#") -> true
+            nextTrim.startsWith("```") -> true
+            next.matches(Regex("^[-*_]{3,}\\s*$")) -> true
+            // List items
+            next.startsWith("- ") || next.startsWith("* ") -> true
+            nextTrim.startsWith("- ") || nextTrim.startsWith("* ") -> true
+            else -> false
+        }
+    }
+
+    /**
      * Returns true when a space should be inserted between two chunks during streaming.
-     * Adds space between English words (e.g. "Hello" + "world" -> "Hello world")
-     * but NOT between digits (25) or inside URLs (runoob.com).
+     * Adds space between English words but NOT in acronyms (NEON, AArch64) or URLs.
      */
     private fun shouldAddSpaceBetweenChunks(prev: String, next: String): Boolean {
+        if (prev.length < 3 || next.length < 3) return false // Avoid "NE ON", "A Arch64"
         val last = prev.last()
         val first = next.first()
         val isLatinLetter = { c: Char -> c in 'a'..'z' || c in 'A'..'Z' }
-        if (!isLatinLetter(last) || !isLatinLetter(first)) return false // Excludes digits
+        if (!isLatinLetter(last) || !isLatinLetter(first)) return false
         val inUrlContext = prev.contains("http://") || prev.contains("https://") || prev.contains("www.")
         return !inUrlContext
     }
