@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
@@ -214,6 +215,13 @@ private fun MarkdownText(
 private fun normalizeMarkdownForRendering(content: String): String {
     return content
         .replace(Regex("""<br\s*/?>""", RegexOption.IGNORE_CASE), "\n")
+        // Insert newline before # header when embedded in line (e.g. "text# 什么是API" -> "text\n# 什么是API")
+        .replace(Regex("""([^\n])(#{1,6}\s)"""), "$1\n$2")
+        // Insert newline around ---/***/___ horizontal rule when followed by text (e.g. "xxx---补充" -> "xxx\n---\n补充")
+        .replace(Regex("""([^\n\-*_])([-*_]{3,})(?=[^\s\-*_\n]|$)"""), "$1\n$2\n")
+        // Insert newline before list items when in middle of line (e.g. "text- item" -> "text\n- item")
+        .replace(Regex("""([^\n])([-*]\s+)(?=\S)"""), "$1\n$2")
+        .replace(Regex("""([^\n])(\d+\.\s)(?=\S)"""), "$1\n$2")
         .replace(Regex("""\*\*\*\s+"""), "***")
         .replace(Regex("""\s+\*\*\*"""), "***")
         .replace(Regex("""\*\*\s+"""), "**")
@@ -249,6 +257,12 @@ private fun buildMarkdownAnnotatedString(content: String, linkColor: Color = Col
     val len = content.length
     while (i < len) {
         when {
+            // List bullet - or * at line start
+            (i == 0 || content.getOrNull(i - 1) == '\n') &&
+                (content.startsWith("- ", i) || content.startsWith("* ", i)) -> {
+                append("• ")
+                i += 2
+            }
             // Markdown header # ## ### (at line start only)
             (i == 0 || content.getOrNull(i - 1) == '\n') && content.getOrNull(i) == '#' -> {
                 var hashCount = 0
@@ -433,23 +447,25 @@ private fun MessageBubble(role: String, content: String, isStreaming: Boolean) {
             else MaterialTheme.colorScheme.surfaceVariant
         ) {
             val displayContent = content.ifEmpty { if (isStreaming) "..." else "" }
-            if (isUser) {
-                Text(
-                    text = displayContent,
-                    modifier = Modifier.padding(12.dp),
-                    style = MaterialTheme.typography.bodyLarge
-                )
-            } else if (isStreaming) {
-                Text(
-                    text = displayContent,
-                    modifier = Modifier.padding(12.dp),
-                    style = MaterialTheme.typography.bodyLarge
-                )
-            } else {
-                MarkdownContent(
-                    content = displayContent,
-                    modifier = Modifier.fillMaxWidth().padding(12.dp)
-                )
+            SelectionContainer {
+                if (isUser) {
+                    Text(
+                        text = displayContent,
+                        modifier = Modifier.padding(12.dp),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                } else if (isStreaming) {
+                    Text(
+                        text = displayContent,
+                        modifier = Modifier.padding(12.dp),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                } else {
+                    MarkdownContent(
+                        content = displayContent,
+                        modifier = Modifier.fillMaxWidth().padding(12.dp)
+                    )
+                }
             }
         }
     }

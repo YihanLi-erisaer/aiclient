@@ -145,10 +145,11 @@ class ChatViewModel(
             // New section after table: prev is full row (has multiple |), next starts new paragraph (e.g. 总结:)
             prev.endsWith("|") && prev.indexOf('|', 1) >= 0 &&
                 (next.startsWith("总") || next.trimStart().startsWith("总")) -> true
-            // Header, code block, horizontal rule
+            // Header, code block, horizontal rule (including "---补充" style)
             next.startsWith("#") -> true
             nextTrim.startsWith("```") -> true
             next.matches(Regex("^[-*_]{3,}\\s*$")) -> true
+            (next.startsWith("---") || next.startsWith("***") || next.startsWith("___")) -> true
             // List items
             next.startsWith("- ") || next.startsWith("* ") -> true
             nextTrim.startsWith("- ") || nextTrim.startsWith("* ") -> true
@@ -158,10 +159,16 @@ class ChatViewModel(
 
     /**
      * Returns true when a space should be inserted between two chunks during streaming.
-     * Adds space between English words but NOT in acronyms (NEON, AArch64) or URLs.
+     * Adds space between English words but NOT in acronyms or compound tech terms.
      */
     private fun shouldAddSpaceBetweenChunks(prev: String, next: String): Boolean {
         if (prev.length < 3 || next.length < 3) return false // Avoid "NE ON", "A Arch64"
+        // Don't add space for compound tech terms (RESTful, Representational, Buffers, gRPC)
+        val noSpaceCompounds = listOf(
+            "REST" to "ful", "Represent" to "ational", "Buff" to "ers",
+            "g" to "RPC", "JSON" to "API", "SOAP" to "API"
+        )
+        if (noSpaceCompounds.any { (p, n) -> prev.endsWith(p) && next.startsWith(n) }) return false
         val last = prev.last()
         val first = next.first()
         val isLatinLetter = { c: Char -> c in 'a'..'z' || c in 'A'..'Z' }
