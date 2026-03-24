@@ -47,8 +47,11 @@ in your IDE's toolbar or run it directly from the terminal:
 
 ---
 **Original UI design link from penpot:** [Original UI design](https://design.penpot.app/#/view?file-id=1c48efe5-2f9f-81cd-8007-c2e878421e35&page-id=1c48efe5-2f9f-81cd-8007-c2e878421e36&section=interactions&index=0&share-id=9afc49c1-9c44-8036-8007-c2f0f444ab94)
+
 Learn more about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html),
+
 [Compose Multiplatform](https://github.com/JetBrains/compose-multiplatform/#compose-multiplatform),
+
 [Kotlin/Wasm](https://kotl.in/wasm/)…
 
 We would appreciate your feedback on Compose/Web and Kotlin/Wasm in the public Slack channel [#compose-web](https://slack-chats.kotlinlang.org/c/compose-web).
