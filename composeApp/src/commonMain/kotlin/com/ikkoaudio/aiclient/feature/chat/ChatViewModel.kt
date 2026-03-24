@@ -13,6 +13,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.random.Random
@@ -40,9 +41,6 @@ class ChatViewModel(
             settingsStore.getMemoryId().collect { id ->
                 _state.update { it.copy(memoryId = id) }
             }
-        }
-        scope.launch {
-            ensureMemoryId()
         }
     }
 
@@ -316,7 +314,21 @@ class ChatViewModel(
         }
     }
 
+    /**
+     * Returns a stable memory id: reads from persistent storage first so we never overwrite
+     * a saved id before DataStore/localStorage has been applied to in-memory state (startup race).
+     */
     private suspend fun ensureMemoryId(): String {
+        val persisted = runCatching {
+            settingsStore.getMemoryId().first()?.trim().orEmpty()
+        }.getOrDefault("").trim()
+        if (persisted.isNotEmpty()) {
+            if (_state.value.memoryId != persisted) {
+                _state.update { it.copy(memoryId = persisted) }
+            }
+            return persisted
+        }
+
         val inState = _state.value.memoryId?.trim().orEmpty()
         if (inState.isNotEmpty()) return inState
 

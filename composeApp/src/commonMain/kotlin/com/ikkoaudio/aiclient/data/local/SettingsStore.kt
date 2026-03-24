@@ -4,7 +4,7 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Platform-agnostic settings store.
- * Uses DataStore on Android, localStorage/simple store on JS.
+ * [getMemoryId] / [setMemoryId] are persisted: DataStore on Android, localStorage on JS/Wasm browser.
  */
 interface SettingsStore {
     fun getApiBaseUrl(): Flow<String>
