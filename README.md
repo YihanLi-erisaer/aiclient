@@ -27,14 +27,23 @@ This project aims to:
 ## System Architecture
 
 Frontend (Kotlin / Compose Multiplatform)
+
 ↓
+
 State Management (MVI / ViewModel)
+
 ↓
+
 API Layer (REST / HTTP Client)
+
 ↓
+
 Backend / Proxy Layer (LLM Adapter / OpenAI-compatible API)
+
 ↓
+
 Multiple LLM Providers (OpenAI / Claude / Gemini / etc.)
+
 ---
 
 ## Key Features
