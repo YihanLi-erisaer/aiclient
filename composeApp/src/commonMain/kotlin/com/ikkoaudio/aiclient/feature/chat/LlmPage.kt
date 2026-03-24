@@ -402,11 +402,16 @@ private fun buildMarkdownAnnotatedString(content: String, linkColor: Color = Col
 
 @Composable
 fun LlmPage(state: ChatState, viewModel: ChatViewModel) {
+    LlmChatBody(state, viewModel, Modifier.fillMaxSize())
+}
+
+@Composable
+fun LlmChatBody(state: ChatState, viewModel: ChatViewModel, modifier: Modifier = Modifier) {
     val listState = rememberLazyListState()
     LaunchedEffect(state.messages.size) {
         if (state.messages.isNotEmpty()) listState.animateScrollToItem(state.messages.size - 1)
     }
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(modifier = modifier) {
         ErrorBanner(state.error) { viewModel.dispatch(ChatIntent.ClearError) }
         LazyColumn(
             modifier = Modifier.weight(1f),
@@ -478,7 +483,12 @@ private fun LlmInputSection(
     onTextChange: (String) -> Unit,
     onSend: () -> Unit
 ) {
-    Surface(tonalElevation = 3.dp) {
+    Surface(
+        tonalElevation = 2.dp,
+        shape = RoundedCornerShape(ChatLayoutTokens.CornerRadius),
+        color = androidx.compose.ui.graphics.Color.White,
+        modifier = Modifier.padding(12.dp)
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -489,15 +499,17 @@ private fun LlmInputSection(
                 value = inputText,
                 onValueChange = onTextChange,
                 modifier = Modifier.weight(1f),
-                placeholder = { Text("Message...") },
+                placeholder = { Text("Enter your question here") },
+                shape = RoundedCornerShape(ChatLayoutTokens.CornerRadius),
                 maxLines = 4
             )
             Spacer(modifier = Modifier.width(8.dp))
             FilledTonalButton(
                 onClick = onSend,
-                enabled = inputText.isNotBlank() && !isLoading
+                enabled = inputText.isNotBlank() && !isLoading,
+                shape = RoundedCornerShape(ChatLayoutTokens.CornerRadius)
             ) {
-                Text("Send")
+                Text("Enter")
             }
         }
     }

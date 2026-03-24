@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -21,7 +21,12 @@ import com.ikkoaudio.aiclient.core.permission.requestRecordPermissionIfNeeded
 
 @Composable
 fun VoiceChatPage(state: ChatState, viewModel: ChatViewModel) {
-    Column(modifier = Modifier.fillMaxSize()) {
+    VoiceChatBody(state, viewModel, Modifier.fillMaxSize())
+}
+
+@Composable
+fun VoiceChatBody(state: ChatState, viewModel: ChatViewModel, modifier: Modifier = Modifier) {
+    Column(modifier = modifier) {
         ErrorBanner(state.error) { viewModel.dispatch(ChatIntent.ClearError) }
         Spacer(modifier = Modifier.weight(1f))
         Column(
@@ -34,11 +39,6 @@ fun VoiceChatPage(state: ChatState, viewModel: ChatViewModel) {
                 CircularProgressIndicator()
                 Spacer(modifier = Modifier.height(16.dp))
             }
-            Text(
-                "Press and hold to speak. Your voice will be sent to the AI and the response played aloud.",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(bottom = 24.dp)
-            )
             Button(
                 onClick = {
                     if (state.isRecording) {
@@ -50,17 +50,31 @@ fun VoiceChatPage(state: ChatState, viewModel: ChatViewModel) {
                         }
                     }
                 },
-                modifier = Modifier.size(120.dp),
-                shape = CircleShape,
+                modifier = Modifier.size(180.dp, 56.dp),
+                shape = RoundedCornerShape(ChatLayoutTokens.CornerRadius),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (state.isRecording)
                         MaterialTheme.colorScheme.error
                     else
-                        MaterialTheme.colorScheme.primary
+                        ChatLayoutTokens.SidebarBackground,
+                    contentColor = if (state.isRecording)
+                        MaterialTheme.colorScheme.onError
+                    else
+                        ChatLayoutTokens.NavText
                 )
             ) {
-                Text(if (state.isRecording) "Stop" else "Hold to talk", style = MaterialTheme.typography.labelMedium)
+                Text(
+                    if (state.isRecording) "Stop" else "Hold to Chat",
+                    style = MaterialTheme.typography.titleSmall
+                )
             }
+            Spacer(modifier = Modifier.height(20.dp))
+            Text(
+                "Press and hold to speak. Your voice will be sent to the AI and the response played aloud.",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
         }
+        Spacer(modifier = Modifier.weight(1f))
     }
 }
