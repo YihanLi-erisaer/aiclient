@@ -25,6 +25,7 @@ This project aims to:
 ---
 
 ## System Architecture
+
 Frontend (Kotlin / Compose Multiplatform)
 ↓
 State Management (MVI / ViewModel)
