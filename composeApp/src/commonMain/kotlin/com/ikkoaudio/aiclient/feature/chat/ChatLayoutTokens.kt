@@ -19,4 +19,9 @@ object ChatLayoutTokens {
     val LeftWeight = 0.22f
     val CenterWeight = 0.56f
     val RightWeight = 0.22f
+    /** Sliding drawer width on narrow screens (capped) */
+    val NarrowDrawerWidthFraction = 0.88f
+    val NarrowDrawerMaxWidth = 360.dp
+    /** Collapsed strip with hamburger when narrow sidebars are closed */
+    val NarrowPeekStripWidth = 52.dp
 }

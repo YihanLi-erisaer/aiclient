@@ -21,8 +21,7 @@ data class ChatState(
     val apiBaseUrl: String = "http://192.168.100.137:8080",
     val isRecording: Boolean = false,
     val isVoiceChat: Boolean = false,  // true = full ASR->LLM->TTS pipeline
-    val selectedPage: AppPage = AppPage.VOICECHAT,
-    val drawerOpen: Boolean = false
+    val selectedPage: AppPage = AppPage.VOICECHAT
 )
 
 data class ChatMessageUi(

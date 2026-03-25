@@ -63,11 +63,7 @@ class ChatViewModel(
             ChatIntent.TextToSpeech -> textToSpeech()
             ChatIntent.ClearError -> _state.update { it.copy(error = null) }
             is ChatIntent.SetError -> _state.update { it.copy(error = intent.message) }
-            ChatIntent.OpenDrawer -> _state.update { it.copy(drawerOpen = true) }
-            ChatIntent.CloseDrawer -> _state.update { it.copy(drawerOpen = false) }
-            is ChatIntent.SelectPage -> _state.update {
-                it.copy(selectedPage = intent.page, drawerOpen = false)
-            }
+            is ChatIntent.SelectPage -> _state.update { it.copy(selectedPage = intent.page) }
         }
     }
 
