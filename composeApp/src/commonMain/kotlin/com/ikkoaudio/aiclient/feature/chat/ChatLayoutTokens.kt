@@ -24,4 +24,6 @@ object ChatLayoutTokens {
     val NarrowDrawerMaxWidth = 360.dp
     /** Collapsed strip with hamburger when narrow sidebars are closed */
     val NarrowPeekStripWidth = 52.dp
+    /** Width reserved for inner-edge handle + content inset from that edge */
+    val SidebarInnerHandleReserve = 44.dp
 }

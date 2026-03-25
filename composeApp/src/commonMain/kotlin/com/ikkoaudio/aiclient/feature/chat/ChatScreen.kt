@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -27,6 +28,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -41,8 +43,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -63,10 +67,12 @@ fun ChatScreen(viewModel: ChatViewModel) {
             }
         }
 
+        val collapsedStrip = ChatLayoutTokens.NarrowPeekStripWidth
+        val handleReserve = ChatLayoutTokens.SidebarInnerHandleReserve
         val leftTargetWide =
-            if (leftOpen) maxWidth * ChatLayoutTokens.LeftWeight else 0.dp
+            if (leftOpen) maxWidth * ChatLayoutTokens.LeftWeight else collapsedStrip
         val rightTargetWide =
-            if (rightOpen) maxWidth * ChatLayoutTokens.RightWeight else 0.dp
+            if (rightOpen) maxWidth * ChatLayoutTokens.RightWeight else collapsedStrip
         val leftWidthWide by animateDpAsState(
             targetValue = leftTargetWide,
             animationSpec = tween(320),
@@ -103,12 +109,18 @@ fun ChatScreen(viewModel: ChatViewModel) {
                             .clip(RectangleShape)
                             .background(ChatLayoutTokens.SidebarBackground)
                     ) {
-                        if (leftWidthWide > 1.dp) {
-                            LeftSidebarWithMenu(
-                                state = state,
-                                onMenuClick = { leftOpen = false }
-                            )
-                        }
+                        LeftSidebarChrome(
+                            state = state,
+                            expanded = leftOpen,
+                            onToggle = {
+                                if (leftOpen) leftOpen = false
+                                else {
+                                    rightOpen = false
+                                    leftOpen = true
+                                }
+                            },
+                            contentPaddingEnd = handleReserve
+                        )
                     }
                     Box(
                         modifier = Modifier
@@ -117,32 +129,6 @@ fun ChatScreen(viewModel: ChatViewModel) {
                             .background(ChatLayoutTokens.CenterBackground)
                     ) {
                         WideCenterPage(state = state, viewModel = viewModel)
-                        if (!leftOpen) {
-                            IconButton(
-                                onClick = { leftOpen = true },
-                                modifier = Modifier
-                                    .align(Alignment.TopStart)
-                                    .padding(4.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Menu,
-                                    contentDescription = "Open left sidebar"
-                                )
-                            }
-                        }
-                        if (!rightOpen) {
-                            IconButton(
-                                onClick = { rightOpen = true },
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(4.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Menu,
-                                    contentDescription = "Open right sidebar"
-                                )
-                            }
-                        }
                     }
                     Box(
                         modifier = Modifier
@@ -151,19 +137,25 @@ fun ChatScreen(viewModel: ChatViewModel) {
                             .clip(RectangleShape)
                             .background(ChatLayoutTokens.SidebarBackground)
                     ) {
-                        if (rightWidthWide > 1.dp) {
-                            RightSidebarWithMenu(
-                                selectedPage = state.selectedPage,
-                                onSelectPage = { viewModel.dispatch(ChatIntent.SelectPage(it)) },
-                                memoryId = state.memoryId,
-                                models = state.models,
-                                selectedModel = state.selectedModel,
-                                onMemoryIdChange = { viewModel.dispatch(ChatIntent.SetMemoryId(it)) },
-                                onModelSelect = { viewModel.dispatch(ChatIntent.SelectModel(it)) },
-                                onLoadModels = { viewModel.dispatch(ChatIntent.LoadModels) },
-                                onMenuClick = { rightOpen = false }
-                            )
-                        }
+                        RightSidebarChrome(
+                            expanded = rightOpen,
+                            onToggle = {
+                                if (rightOpen) rightOpen = false
+                                else {
+                                    leftOpen = false
+                                    rightOpen = true
+                                }
+                            },
+                            contentPaddingStart = handleReserve,
+                            selectedPage = state.selectedPage,
+                            onSelectPage = { viewModel.dispatch(ChatIntent.SelectPage(it)) },
+                            memoryId = state.memoryId,
+                            models = state.models,
+                            selectedModel = state.selectedModel,
+                            onMemoryIdChange = { viewModel.dispatch(ChatIntent.SetMemoryId(it)) },
+                            onModelSelect = { viewModel.dispatch(ChatIntent.SelectModel(it)) },
+                            onLoadModels = { viewModel.dispatch(ChatIntent.LoadModels) }
+                        )
                     }
                 }
             } else {
@@ -175,29 +167,18 @@ fun ChatScreen(viewModel: ChatViewModel) {
                             .clip(RectangleShape)
                             .background(ChatLayoutTokens.SidebarBackground)
                     ) {
-                        if (leftOpen) {
-                            LeftSidebarWithMenu(
-                                state = state,
-                                onMenuClick = { leftOpen = false }
-                            )
-                        } else {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                IconButton(
-                                    onClick = {
-                                        rightOpen = false
-                                        leftOpen = true
-                                    }
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Menu,
-                                        contentDescription = "Open chat history"
-                                    )
+                        LeftSidebarChrome(
+                            state = state,
+                            expanded = leftOpen,
+                            onToggle = {
+                                if (leftOpen) leftOpen = false
+                                else {
+                                    rightOpen = false
+                                    leftOpen = true
                                 }
-                            }
-                        }
+                            },
+                            contentPaddingEnd = handleReserve
+                        )
                     }
                     Box(
                         modifier = Modifier
@@ -214,36 +195,25 @@ fun ChatScreen(viewModel: ChatViewModel) {
                             .clip(RectangleShape)
                             .background(ChatLayoutTokens.SidebarBackground)
                     ) {
-                        if (rightOpen) {
-                            RightSidebarWithMenu(
-                                selectedPage = state.selectedPage,
-                                onSelectPage = { viewModel.dispatch(ChatIntent.SelectPage(it)) },
-                                memoryId = state.memoryId,
-                                models = state.models,
-                                selectedModel = state.selectedModel,
-                                onMemoryIdChange = { viewModel.dispatch(ChatIntent.SetMemoryId(it)) },
-                                onModelSelect = { viewModel.dispatch(ChatIntent.SelectModel(it)) },
-                                onLoadModels = { viewModel.dispatch(ChatIntent.LoadModels) },
-                                onMenuClick = { rightOpen = false }
-                            )
-                        } else {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                IconButton(
-                                    onClick = {
-                                        leftOpen = false
-                                        rightOpen = true
-                                    }
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Menu,
-                                        contentDescription = "Open navigation"
-                                    )
+                        RightSidebarChrome(
+                            expanded = rightOpen,
+                            onToggle = {
+                                if (rightOpen) rightOpen = false
+                                else {
+                                    leftOpen = false
+                                    rightOpen = true
                                 }
-                            }
-                        }
+                            },
+                            contentPaddingStart = handleReserve,
+                            selectedPage = state.selectedPage,
+                            onSelectPage = { viewModel.dispatch(ChatIntent.SelectPage(it)) },
+                            memoryId = state.memoryId,
+                            models = state.models,
+                            selectedModel = state.selectedModel,
+                            onMemoryIdChange = { viewModel.dispatch(ChatIntent.SetMemoryId(it)) },
+                            onModelSelect = { viewModel.dispatch(ChatIntent.SelectModel(it)) },
+                            onLoadModels = { viewModel.dispatch(ChatIntent.LoadModels) }
+                        )
                     }
                 }
             }
@@ -252,31 +222,43 @@ fun ChatScreen(viewModel: ChatViewModel) {
 }
 
 @Composable
-private fun LeftSidebarWithMenu(
+private fun LeftSidebarChrome(
     state: ChatState,
-    onMenuClick: () -> Unit
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    contentPaddingEnd: Dp
 ) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Start,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onMenuClick) {
-                Icon(
-                    imageVector = Icons.Filled.Menu,
-                    contentDescription = "Close sidebar"
-                )
+    val reserve = ChatLayoutTokens.SidebarInnerHandleReserve
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (expanded) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(end = contentPaddingEnd)
+            ) {
+                LeftSidebarContent(state = state)
             }
         }
-        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-            LeftSidebarContent(state = state)
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight()
+                .width(reserve),
+            contentAlignment = Alignment.Center
+        ) {
+            InnerEdgeMenuIconButton(
+                onClick = onToggle,
+                contentDescription = if (expanded) "Close left sidebar" else "Open left sidebar"
+            )
         }
     }
 }
 
 @Composable
-private fun RightSidebarWithMenu(
+private fun RightSidebarChrome(
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    contentPaddingStart: Dp,
     selectedPage: AppPage,
     onSelectPage: (AppPage) -> Unit,
     memoryId: String?,
@@ -284,36 +266,62 @@ private fun RightSidebarWithMenu(
     selectedModel: String?,
     onMemoryIdChange: (String?) -> Unit,
     onModelSelect: (String) -> Unit,
-    onLoadModels: () -> Unit,
-    onMenuClick: () -> Unit
+    onLoadModels: () -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(end = 4.dp),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onMenuClick) {
-                Icon(
-                    imageVector = Icons.Filled.Menu,
-                    contentDescription = "Close sidebar"
+    val reserve = ChatLayoutTokens.SidebarInnerHandleReserve
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (expanded) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(start = contentPaddingStart)
+            ) {
+                RightSidebarNav(
+                    selectedPage = selectedPage,
+                    onSelectPage = onSelectPage,
+                    memoryId = memoryId,
+                    models = models,
+                    selectedModel = selectedModel,
+                    onMemoryIdChange = onMemoryIdChange,
+                    onModelSelect = onModelSelect,
+                    onLoadModels = onLoadModels
                 )
             }
         }
-        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-            RightSidebarNav(
-                selectedPage = selectedPage,
-                onSelectPage = onSelectPage,
-                memoryId = memoryId,
-                models = models,
-                selectedModel = selectedModel,
-                onMemoryIdChange = onMemoryIdChange,
-                onModelSelect = onModelSelect,
-                onLoadModels = onLoadModels
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .fillMaxHeight()
+                .width(reserve),
+            contentAlignment = Alignment.Center
+        ) {
+            InnerEdgeMenuIconButton(
+                onClick = onToggle,
+                contentDescription = if (expanded) "Close right sidebar" else "Open right sidebar"
             )
         }
+    }
+}
+
+@Composable
+private fun InnerEdgeMenuIconButton(
+    onClick: () -> Unit,
+    contentDescription: String
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier.size(48.dp),
+        colors = IconButtonDefaults.iconButtonColors(
+            containerColor = Color.Transparent,
+            contentColor = ChatLayoutTokens.FrontColor
+        )
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Menu,
+            contentDescription = contentDescription,
+            modifier = Modifier.size(24.dp),
+            tint = ChatLayoutTokens.FrontColor
+        )
     }
 }
 

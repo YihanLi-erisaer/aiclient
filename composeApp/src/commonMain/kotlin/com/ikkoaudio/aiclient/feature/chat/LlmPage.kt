@@ -421,7 +421,7 @@ fun LlmChatBody(state: ChatState, viewModel: ChatViewModel, modifier: Modifier =
             modifier = Modifier.weight(1f),
             state = listState,
             verticalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(16.dp)
+            contentPadding = PaddingValues(48.dp)
         ) {
             items(state.messages, key = { it.id }) { msg ->
                 MessageBubble(role = msg.role, content = msg.content, isStreaming = msg.isStreaming)
