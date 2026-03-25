@@ -196,9 +196,9 @@ private fun RightSidebarNav(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(40.dp, Alignment.CenterVertically)
     ) {
-        Spacer(modifier = Modifier.weight(0.15f))
+        Spacer(modifier = Modifier.weight(0.2f))
         ModeNavButton(
             label = "Voice Chat",
             selected = selectedPage == AppPage.VOICECHAT,
