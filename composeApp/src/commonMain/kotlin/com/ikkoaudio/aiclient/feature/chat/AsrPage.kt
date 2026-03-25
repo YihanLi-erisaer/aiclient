@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -65,21 +66,25 @@ fun AsrCenterPanel(state: ChatState, viewModel: ChatViewModel, modifier: Modifie
                         viewModel.dispatch(ChatIntent.StopRecording)
                     } else {
                         requestRecordPermissionIfNeeded { granted ->
-                            if (granted) viewModel.dispatch(ChatIntent.StartRecording)
+                            if (granted) viewModel.dispatch(ChatIntent.StartVoiceChat)
                             else viewModel.dispatch(ChatIntent.SetError("Microphone permission is required for recording"))
                         }
                     }
                 },
-                modifier = Modifier.size(120.dp),
-                shape = CircleShape,
+                modifier = Modifier.size(180.dp, 56.dp),
+                shape = RoundedCornerShape(ChatLayoutTokens.CornerRadius),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (state.isRecording)
                         MaterialTheme.colorScheme.error
                     else
-                        MaterialTheme.colorScheme.primary
+                        ChatLayoutTokens.SidebarBackground,
+                    contentColor = if (state.isRecording)
+                        MaterialTheme.colorScheme.onError
+                    else
+                        ChatLayoutTokens.NavText
                 )
             ) {
-                Text(if (state.isRecording) "Stop" else "Record", style = MaterialTheme.typography.labelMedium)
+                Text(if (state.isRecording) "Stop" else "Record", style = MaterialTheme.typography.titleSmall)
             }
             Spacer(modifier = Modifier.height(16.dp))
             Text(
@@ -121,21 +126,25 @@ fun AsrPage(state: ChatState, viewModel: ChatViewModel) {
                         viewModel.dispatch(ChatIntent.StopRecording)
                     } else {
                         requestRecordPermissionIfNeeded { granted ->
-                            if (granted) viewModel.dispatch(ChatIntent.StartRecording)
+                            if (granted) viewModel.dispatch(ChatIntent.StartVoiceChat)
                             else viewModel.dispatch(ChatIntent.SetError("Microphone permission is required for recording"))
                         }
                     }
                 },
-                modifier = Modifier.size(120.dp),
-                shape = CircleShape,
+                modifier = Modifier.size(180.dp, 56.dp),
+                shape = RoundedCornerShape(ChatLayoutTokens.CornerRadius),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (state.isRecording)
                         MaterialTheme.colorScheme.error
                     else
-                        MaterialTheme.colorScheme.primary
+                        ChatLayoutTokens.SidebarBackground,
+                    contentColor = if (state.isRecording)
+                        MaterialTheme.colorScheme.onError
+                    else
+                        ChatLayoutTokens.NavText
                 )
             ) {
-                Text(if (state.isRecording) "Stop" else "Record", style = MaterialTheme.typography.labelMedium)
+                Text(if (state.isRecording) "Stop" else "Record", style = MaterialTheme.typography.titleSmall)
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(

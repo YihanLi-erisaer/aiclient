@@ -17,12 +17,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextFieldColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -38,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material3.TextFieldDefaults
 
 private sealed class MarkdownBlock {
     data class Paragraph(val text: String) : MarkdownBlock()
@@ -113,7 +116,8 @@ private fun MarkdownContent(
     linkColor: Color = MaterialTheme.colorScheme.primary
 ) {
     val blocks = remember(content) { parseMarkdownBlocks(content) }
-    val textColor = MaterialTheme.colorScheme.onSurfaceVariant
+    // val textColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val textColor = ChatLayoutTokens.FrontColor
     Column(modifier = modifier) {
         blocks.forEach { block ->
             when (block) {
@@ -144,7 +148,7 @@ private fun MarkdownContent(
                                 .padding(vertical = 8.dp)
                                 .padding(bottom = 12.dp)
                                 .fillMaxWidth()
-                                .background(MaterialTheme.colorScheme.surface)
+                                .background(ChatLayoutTokens.SidebarBackground)
                         ) {
                             rows.forEachIndexed { rowIdx, cells ->
                                 Row(
@@ -165,7 +169,7 @@ private fun MarkdownContent(
                                                 fontFamily = FontFamily.Monospace,
                                                 fontWeight = if (rowIdx == 0) FontWeight.Bold else FontWeight.Normal,
                                                 color = if (rowIdx == 0) {
-                                                    MaterialTheme.colorScheme.primary
+                                                    ChatLayoutTokens.FrontColor
                                                 } else textColor
                                             )
                                         }
@@ -448,8 +452,9 @@ private fun MessageBubble(role: String, content: String, isStreaming: Boolean) {
                 bottomStart = if (isUser) 12.dp else 4.dp,
                 bottomEnd = if (isUser) 4.dp else 12.dp
             ),
-            color = if (isUser) MaterialTheme.colorScheme.primaryContainer
-            else MaterialTheme.colorScheme.surfaceVariant
+            // color = if (isUser) MaterialTheme.colorScheme.primaryContainer
+            // else MaterialTheme.colorScheme.surfaceVariant
+            color = ChatLayoutTokens.SidebarBackground
         ) {
             val displayContent = content.ifEmpty { if (isStreaming) "..." else "" }
             SelectionContainer {
@@ -486,7 +491,7 @@ private fun LlmInputSection(
     Surface(
         tonalElevation = 2.dp,
         shape = RoundedCornerShape(ChatLayoutTokens.CornerRadius),
-        color = androidx.compose.ui.graphics.Color.White,
+        color = androidx.compose.ui.graphics.Color.Unspecified,
         modifier = Modifier.padding(12.dp)
     ) {
         Row(
@@ -499,17 +504,30 @@ private fun LlmInputSection(
                 value = inputText,
                 onValueChange = onTextChange,
                 modifier = Modifier.weight(1f),
-                placeholder = { Text("Enter your question here") },
+                placeholder = { Text("Enter your question here", style =  MaterialTheme.typography.titleSmall,
+                    color = ChatLayoutTokens.FrontColor) },
                 shape = RoundedCornerShape(ChatLayoutTokens.CornerRadius),
-                maxLines = 4
+                maxLines = 4,
+                colors = TextFieldDefaults.colors(
+                    unfocusedContainerColor = ChatLayoutTokens.SidebarBackground,
+                    focusedContainerColor = ChatLayoutTokens.SidebarBackground,
+
+                    focusedIndicatorColor = Color.Black,
+                    unfocusedIndicatorColor = ChatLayoutTokens.SidebarBackground
+                )
+                // colors = ChatLayoutTokens.SidebarBackground
             )
             Spacer(modifier = Modifier.width(8.dp))
             FilledTonalButton(
                 onClick = onSend,
                 enabled = inputText.isNotBlank() && !isLoading,
-                shape = RoundedCornerShape(ChatLayoutTokens.CornerRadius)
+                shape = RoundedCornerShape(ChatLayoutTokens.CornerRadius),
+                // colors = ChatLayoutTokens.SidebarBackground
+                colors = ButtonDefaults.buttonColors(
+                        ChatLayoutTokens.SidebarBackground,
+                )
             ) {
-                Text("Enter")
+                Text("Enter", style = MaterialTheme.typography.titleSmall, color = ChatLayoutTokens.FrontColor)
             }
         }
     }
