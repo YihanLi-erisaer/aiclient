@@ -50,8 +50,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.DrawerValue
 import kotlinx.coroutines.flow.collectLatest
@@ -154,7 +154,6 @@ private fun ChatHistorySidebar(messages: List<ChatMessageUi>, isVoicePage: Boole
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(messages, key = { it.id }) { msg ->
-                    val preview = msg.content.replace("\n", " ").take(80)
                     val label = if (msg.role == "user") "You" else "Assistant"
                     Surface(
                         shape = RoundedCornerShape(8.dp),
@@ -168,11 +167,10 @@ private fun ChatHistorySidebar(messages: List<ChatMessageUi>, isVoicePage: Boole
                                 color = MaterialTheme.colorScheme.primary
                             )
                             Text(
-                                text = preview.ifEmpty { "…" },
+                                text = msg.content.ifBlank { "…" },
                                 style = MaterialTheme.typography.bodySmall,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                color = ChatLayoutTokens.NavText
+                                color = ChatLayoutTokens.NavText,
+                                modifier = Modifier.fillMaxWidth()
                             )
                         }
                     }
