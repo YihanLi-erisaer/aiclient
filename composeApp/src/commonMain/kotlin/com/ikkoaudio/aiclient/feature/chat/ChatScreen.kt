@@ -25,7 +25,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -137,28 +136,21 @@ fun ChatScreen(viewModel: ChatViewModel) {
                             .clip(RectangleShape)
                             .background(ChatLayoutTokens.SidebarBackground)
                     ) {
-                        Column(modifier = Modifier.fillMaxSize()) {
-                            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                                RightSidebarChrome(
-                                    expanded = rightOpen,
-                                    onToggle = {
-                                        if (rightOpen) rightOpen = false
-                                        else {
-                                            leftOpen = false
-                                            rightOpen = true
-                                        }
-                                    },
-                                    contentPaddingStart = handleReserve,
-                                    selectedPage = state.selectedPage,
-                                    onSelectPage = { viewModel.dispatch(ChatIntent.SelectPage(it)) }
-                                )
-                            }
-                            AnimatedVisibility(visible = rightOpen) {
-                                SidebarSettingsEntry(
-                                    onOpenSettings = { viewModel.dispatch(ChatIntent.OpenSettingsScreen) }
-                                )
-                            }
-                        }
+                        RightSidebarChrome(
+                            expanded = rightOpen,
+                            onToggle = {
+                                if (rightOpen) rightOpen = false
+                                else {
+                                    leftOpen = false
+                                    rightOpen = true
+                                }
+                            },
+                            contentPaddingStart = handleReserve,
+                            selectedPage = state.selectedPage,
+                            onSelectPage = { viewModel.dispatch(ChatIntent.SelectPage(it)) },
+                            settingsScreenVisible = state.settingsScreenVisible,
+                            onOpenSettings = { viewModel.dispatch(ChatIntent.OpenSettingsScreen) }
+                        )
                     }
                 }
             } else {
@@ -200,28 +192,21 @@ fun ChatScreen(viewModel: ChatViewModel) {
                             .clip(RectangleShape)
                             .background(ChatLayoutTokens.SidebarBackground)
                     ) {
-                        Column(modifier = Modifier.fillMaxSize()) {
-                            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                                RightSidebarChrome(
-                                    expanded = rightOpen,
-                                    onToggle = {
-                                        if (rightOpen) rightOpen = false
-                                        else {
-                                            leftOpen = false
-                                            rightOpen = true
-                                        }
-                                    },
-                                    contentPaddingStart = handleReserve,
-                                    selectedPage = state.selectedPage,
-                                    onSelectPage = { viewModel.dispatch(ChatIntent.SelectPage(it)) }
-                                )
-                            }
-                            AnimatedVisibility(visible = rightOpen) {
-                                SidebarSettingsEntry(
-                                    onOpenSettings = { viewModel.dispatch(ChatIntent.OpenSettingsScreen) }
-                                )
-                            }
-                        }
+                        RightSidebarChrome(
+                            expanded = rightOpen,
+                            onToggle = {
+                                if (rightOpen) rightOpen = false
+                                else {
+                                    leftOpen = false
+                                    rightOpen = true
+                                }
+                            },
+                            contentPaddingStart = handleReserve,
+                            selectedPage = state.selectedPage,
+                            onSelectPage = { viewModel.dispatch(ChatIntent.SelectPage(it)) },
+                            settingsScreenVisible = state.settingsScreenVisible,
+                            onOpenSettings = { viewModel.dispatch(ChatIntent.OpenSettingsScreen) }
+                        )
                     }
                 }
             }
@@ -239,28 +224,6 @@ fun ChatScreen(viewModel: ChatViewModel) {
                 )
             }
         }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SidebarSettingsEntry(onOpenSettings: () -> Unit) {
-    HorizontalDivider(
-        thickness = 1.dp,
-        color = MaterialTheme.colorScheme.outlineVariant
-    )
-    Surface(
-        onClick = onOpenSettings,
-        modifier = Modifier.fillMaxWidth(),
-        color = ChatLayoutTokens.NavInactiveBackground,
-        shape = RoundedCornerShape(0.dp)
-    ) {
-        Text(
-            text = "Settings",
-            modifier = Modifier.padding(vertical = 14.dp, horizontal = 12.dp),
-            style = MaterialTheme.typography.labelLarge,
-            color = ChatLayoutTokens.NavText
-        )
     }
 }
 
@@ -303,7 +266,9 @@ private fun RightSidebarChrome(
     onToggle: () -> Unit,
     contentPaddingStart: Dp,
     selectedPage: AppPage,
-    onSelectPage: (AppPage) -> Unit
+    onSelectPage: (AppPage) -> Unit,
+    settingsScreenVisible: Boolean,
+    onOpenSettings: () -> Unit
 ) {
     val reserve = ChatLayoutTokens.SidebarInnerHandleReserve
     Box(modifier = Modifier.fillMaxSize()) {
@@ -315,7 +280,9 @@ private fun RightSidebarChrome(
             ) {
                 RightSidebarNav(
                     selectedPage = selectedPage,
-                    onSelectPage = onSelectPage
+                    onSelectPage = onSelectPage,
+                    settingsScreenVisible = settingsScreenVisible,
+                    onOpenSettings = onOpenSettings
                 )
             }
         }
@@ -425,7 +392,9 @@ private fun ChatHistorySidebar(messages: List<ChatMessageUi>, isVoicePage: Boole
 @Composable
 private fun RightSidebarNav(
     selectedPage: AppPage,
-    onSelectPage: (AppPage) -> Unit
+    onSelectPage: (AppPage) -> Unit,
+    settingsScreenVisible: Boolean,
+    onOpenSettings: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -436,23 +405,28 @@ private fun RightSidebarNav(
         Spacer(modifier = Modifier.weight(0.2f))
         ModeNavButton(
             label = "Voice Chat",
-            selected = selectedPage == AppPage.VOICECHAT,
+            selected = selectedPage == AppPage.VOICECHAT && !settingsScreenVisible,
             onClick = { onSelectPage(AppPage.VOICECHAT) }
         )
         ModeNavButton(
             label = "LLM",
-            selected = selectedPage == AppPage.LLM,
+            selected = selectedPage == AppPage.LLM && !settingsScreenVisible,
             onClick = { onSelectPage(AppPage.LLM) }
         )
         ModeNavButton(
             label = "ASR",
-            selected = selectedPage == AppPage.ASR,
+            selected = selectedPage == AppPage.ASR && !settingsScreenVisible,
             onClick = { onSelectPage(AppPage.ASR) }
         )
         ModeNavButton(
             label = "TTS",
-            selected = selectedPage == AppPage.TTS,
+            selected = selectedPage == AppPage.TTS && !settingsScreenVisible,
             onClick = { onSelectPage(AppPage.TTS) }
+        )
+        ModeNavButton(
+            label = "Settings",
+            selected = settingsScreenVisible,
+            onClick = onOpenSettings
         )
         Spacer(modifier = Modifier.weight(1f))
     }

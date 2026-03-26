@@ -63,7 +63,9 @@ class ChatViewModel(
             ChatIntent.TextToSpeech -> textToSpeech()
             ChatIntent.ClearError -> _state.update { it.copy(error = null) }
             is ChatIntent.SetError -> _state.update { it.copy(error = intent.message) }
-            is ChatIntent.SelectPage -> _state.update { it.copy(selectedPage = intent.page) }
+            is ChatIntent.SelectPage -> _state.update {
+                it.copy(selectedPage = intent.page, settingsScreenVisible = false)
+            }
             ChatIntent.OpenSettingsScreen -> _state.update { it.copy(settingsScreenVisible = true) }
             ChatIntent.CloseSettingsScreen -> _state.update { it.copy(settingsScreenVisible = false) }
         }
