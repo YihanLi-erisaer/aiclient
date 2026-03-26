@@ -1,9 +1,11 @@
 package com.ikkoaudio.aiclient.feature.chat
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -22,15 +24,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,7 +44,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -109,18 +107,20 @@ fun ChatScreen(viewModel: ChatViewModel) {
                             .clip(RectangleShape)
                             .background(ChatLayoutTokens.SidebarBackground)
                     ) {
-                        LeftSidebarChrome(
-                            state = state,
-                            expanded = leftOpen,
-                            onToggle = {
-                                if (leftOpen) leftOpen = false
-                                else {
-                                    rightOpen = false
-                                    leftOpen = true
-                                }
-                            },
-                            contentPaddingEnd = handleReserve
-                        )
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            LeftSidebarChrome(
+                                state = state,
+                                expanded = leftOpen,
+                                onToggle = {
+                                    if (leftOpen) leftOpen = false
+                                    else {
+                                        rightOpen = false
+                                        leftOpen = true
+                                    }
+                                },
+                                contentPaddingEnd = handleReserve
+                            )
+                        }
                     }
                     Box(
                         modifier = Modifier
@@ -137,25 +137,28 @@ fun ChatScreen(viewModel: ChatViewModel) {
                             .clip(RectangleShape)
                             .background(ChatLayoutTokens.SidebarBackground)
                     ) {
-                        RightSidebarChrome(
-                            expanded = rightOpen,
-                            onToggle = {
-                                if (rightOpen) rightOpen = false
-                                else {
-                                    leftOpen = false
-                                    rightOpen = true
-                                }
-                            },
-                            contentPaddingStart = handleReserve,
-                            selectedPage = state.selectedPage,
-                            onSelectPage = { viewModel.dispatch(ChatIntent.SelectPage(it)) },
-                            memoryId = state.memoryId,
-                            models = state.models,
-                            selectedModel = state.selectedModel,
-                            onMemoryIdChange = { viewModel.dispatch(ChatIntent.SetMemoryId(it)) },
-                            onModelSelect = { viewModel.dispatch(ChatIntent.SelectModel(it)) },
-                            onLoadModels = { viewModel.dispatch(ChatIntent.LoadModels) }
-                        )
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                                RightSidebarChrome(
+                                    expanded = rightOpen,
+                                    onToggle = {
+                                        if (rightOpen) rightOpen = false
+                                        else {
+                                            leftOpen = false
+                                            rightOpen = true
+                                        }
+                                    },
+                                    contentPaddingStart = handleReserve,
+                                    selectedPage = state.selectedPage,
+                                    onSelectPage = { viewModel.dispatch(ChatIntent.SelectPage(it)) }
+                                )
+                            }
+                            AnimatedVisibility(visible = rightOpen) {
+                                SidebarSettingsEntry(
+                                    onOpenSettings = { viewModel.dispatch(ChatIntent.OpenSettingsScreen) }
+                                )
+                            }
+                        }
                     }
                 }
             } else {
@@ -167,18 +170,20 @@ fun ChatScreen(viewModel: ChatViewModel) {
                             .clip(RectangleShape)
                             .background(ChatLayoutTokens.SidebarBackground)
                     ) {
-                        LeftSidebarChrome(
-                            state = state,
-                            expanded = leftOpen,
-                            onToggle = {
-                                if (leftOpen) leftOpen = false
-                                else {
-                                    rightOpen = false
-                                    leftOpen = true
-                                }
-                            },
-                            contentPaddingEnd = handleReserve
-                        )
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            LeftSidebarChrome(
+                                state = state,
+                                expanded = leftOpen,
+                                onToggle = {
+                                    if (leftOpen) leftOpen = false
+                                    else {
+                                        rightOpen = false
+                                        leftOpen = true
+                                    }
+                                },
+                                contentPaddingEnd = handleReserve
+                            )
+                        }
                     }
                     Box(
                         modifier = Modifier
@@ -195,29 +200,67 @@ fun ChatScreen(viewModel: ChatViewModel) {
                             .clip(RectangleShape)
                             .background(ChatLayoutTokens.SidebarBackground)
                     ) {
-                        RightSidebarChrome(
-                            expanded = rightOpen,
-                            onToggle = {
-                                if (rightOpen) rightOpen = false
-                                else {
-                                    leftOpen = false
-                                    rightOpen = true
-                                }
-                            },
-                            contentPaddingStart = handleReserve,
-                            selectedPage = state.selectedPage,
-                            onSelectPage = { viewModel.dispatch(ChatIntent.SelectPage(it)) },
-                            memoryId = state.memoryId,
-                            models = state.models,
-                            selectedModel = state.selectedModel,
-                            onMemoryIdChange = { viewModel.dispatch(ChatIntent.SetMemoryId(it)) },
-                            onModelSelect = { viewModel.dispatch(ChatIntent.SelectModel(it)) },
-                            onLoadModels = { viewModel.dispatch(ChatIntent.LoadModels) }
-                        )
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                                RightSidebarChrome(
+                                    expanded = rightOpen,
+                                    onToggle = {
+                                        if (rightOpen) rightOpen = false
+                                        else {
+                                            leftOpen = false
+                                            rightOpen = true
+                                        }
+                                    },
+                                    contentPaddingStart = handleReserve,
+                                    selectedPage = state.selectedPage,
+                                    onSelectPage = { viewModel.dispatch(ChatIntent.SelectPage(it)) }
+                                )
+                            }
+                            AnimatedVisibility(visible = rightOpen) {
+                                SidebarSettingsEntry(
+                                    onOpenSettings = { viewModel.dispatch(ChatIntent.OpenSettingsScreen) }
+                                )
+                            }
+                        }
                     }
                 }
             }
+
+            AnimatedVisibility(
+                visible = state.settingsScreenVisible,
+                enter = slideInHorizontally(animationSpec = tween(320)) { it },
+                exit = slideOutHorizontally(animationSpec = tween(320)) { it },
+                modifier = Modifier.fillMaxSize()
+            ) {
+                SettingsFullScreen(
+                    state = state,
+                    viewModel = viewModel,
+                    onClose = { viewModel.dispatch(ChatIntent.CloseSettingsScreen) }
+                )
+            }
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SidebarSettingsEntry(onOpenSettings: () -> Unit) {
+    HorizontalDivider(
+        thickness = 1.dp,
+        color = MaterialTheme.colorScheme.outlineVariant
+    )
+    Surface(
+        onClick = onOpenSettings,
+        modifier = Modifier.fillMaxWidth(),
+        color = ChatLayoutTokens.NavInactiveBackground,
+        shape = RoundedCornerShape(0.dp)
+    ) {
+        Text(
+            text = "Settings",
+            modifier = Modifier.padding(vertical = 14.dp, horizontal = 12.dp),
+            style = MaterialTheme.typography.labelLarge,
+            color = ChatLayoutTokens.NavText
+        )
     }
 }
 
@@ -260,13 +303,7 @@ private fun RightSidebarChrome(
     onToggle: () -> Unit,
     contentPaddingStart: Dp,
     selectedPage: AppPage,
-    onSelectPage: (AppPage) -> Unit,
-    memoryId: String?,
-    models: List<com.ikkoaudio.aiclient.domain.model.LlmModel>,
-    selectedModel: String?,
-    onMemoryIdChange: (String?) -> Unit,
-    onModelSelect: (String) -> Unit,
-    onLoadModels: () -> Unit
+    onSelectPage: (AppPage) -> Unit
 ) {
     val reserve = ChatLayoutTokens.SidebarInnerHandleReserve
     Box(modifier = Modifier.fillMaxSize()) {
@@ -278,13 +315,7 @@ private fun RightSidebarChrome(
             ) {
                 RightSidebarNav(
                     selectedPage = selectedPage,
-                    onSelectPage = onSelectPage,
-                    memoryId = memoryId,
-                    models = models,
-                    selectedModel = selectedModel,
-                    onMemoryIdChange = onMemoryIdChange,
-                    onModelSelect = onModelSelect,
-                    onLoadModels = onLoadModels
+                    onSelectPage = onSelectPage
                 )
             }
         }
@@ -394,13 +425,7 @@ private fun ChatHistorySidebar(messages: List<ChatMessageUi>, isVoicePage: Boole
 @Composable
 private fun RightSidebarNav(
     selectedPage: AppPage,
-    onSelectPage: (AppPage) -> Unit,
-    memoryId: String?,
-    models: List<com.ikkoaudio.aiclient.domain.model.LlmModel>,
-    selectedModel: String?,
-    onMemoryIdChange: (String?) -> Unit,
-    onModelSelect: (String) -> Unit,
-    onLoadModels: () -> Unit
+    onSelectPage: (AppPage) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -430,14 +455,6 @@ private fun RightSidebarNav(
             onClick = { onSelectPage(AppPage.TTS) }
         )
         Spacer(modifier = Modifier.weight(1f))
-        SettingsSidebarSection(
-            memoryId = memoryId,
-            models = models,
-            selectedModel = selectedModel,
-            onMemoryIdChange = onMemoryIdChange,
-            onModelSelect = onModelSelect,
-            onLoadModels = onLoadModels
-        )
     }
 }
 
@@ -460,56 +477,6 @@ private fun ModeNavButton(
             style = MaterialTheme.typography.labelLarge,
             color = ChatLayoutTokens.NavText
         )
-    }
-}
-
-@Composable
-private fun SettingsSidebarSection(
-    memoryId: String?,
-    models: List<com.ikkoaudio.aiclient.domain.model.LlmModel>,
-    selectedModel: String?,
-    onMemoryIdChange: (String?) -> Unit,
-    onModelSelect: (String) -> Unit,
-    onLoadModels: () -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .clickable { expanded = !expanded }
-            .padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text("Settings", style = MaterialTheme.typography.titleSmall, color = ChatLayoutTokens.NavText)
-        Text(if (expanded) "−" else "+", style = MaterialTheme.typography.titleMedium)
-    }
-    if (expanded) {
-        Column(
-            modifier = Modifier.padding(bottom = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            OutlinedTextField(
-                value = memoryId ?: "",
-                onValueChange = { onMemoryIdChange(it.ifEmpty { null }) },
-                label = { Text("Memory ID") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            Button(onClick = onLoadModels, modifier = Modifier.fillMaxWidth()) {
-                Text("Load Models")
-            }
-            models.forEach { model ->
-                FilterChip(
-                    selected = model.name == selectedModel,
-                    onClick = { onModelSelect(model.name) },
-                    label = { Text(model.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
     }
 }
 

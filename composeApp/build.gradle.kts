@@ -10,6 +10,37 @@ plugins {
     alias(libs.plugins.kotlinxSerialization)
 }
 
+/** In-app and Android `versionName`; reflected in generated [com.ikkoaudio.aiclient.AppVersion]. */
+val appVersionName = "2.0"
+
+val generateAppVersion by tasks.registering {
+    val outDir = layout.buildDirectory.dir("generated/kotlin/appversion")
+    val versionForSource = appVersionName.replace("\\", "\\\\").replace("\"", "\\\"")
+    outputs.dir(outDir)
+    doLast {
+        val file = outDir.get().asFile.resolve("com/ikkoaudio/aiclient/AppVersion.kt")
+        file.parentFile.mkdirs()
+        file.writeText(
+            """
+            package com.ikkoaudio.aiclient
+
+            /** Generated from composeApp/build.gradle.kts (appVersionName). Do not edit. */
+            object AppVersion {
+                const val VERSION_NAME: String = "$versionForSource"
+            }
+            """.trimIndent() + "\n"
+        )
+    }
+}
+
+afterEvaluate {
+    tasks.matching { task ->
+        task.name.matches(Regex("compile.*Kotlin.*", RegexOption.IGNORE_CASE))
+    }.configureEach {
+        dependsOn(generateAppVersion)
+    }
+}
+
 kotlin {
     androidTarget {
         compilerOptions {
@@ -36,7 +67,9 @@ kotlin {
             implementation(libs.ktor.client.okhttp)
             implementation(libs.slf4j.android)
         }
-        commonMain.dependencies {
+        commonMain {
+            kotlin.srcDir(layout.buildDirectory.dir("generated/kotlin/appversion"))
+            dependencies {
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)
             implementation(libs.compose.material3)
@@ -52,6 +85,7 @@ kotlin {
             implementation(libs.ktor.client.content.negotiation)
             implementation(libs.ktor.client.logging)
             implementation(libs.ktor.serialization.kotlinx.json)
+            }
         }
         jsMain.dependencies {
             implementation(libs.ktor.client.cio)
@@ -74,7 +108,7 @@ android {
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
-        versionName = "1.0"
+        versionName = appVersionName
     }
     packaging {
         resources {

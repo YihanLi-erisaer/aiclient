@@ -16,4 +16,6 @@ package com.ikkoaudio.aiclient.feature.chat
     object ClearError : ChatIntent()
     data class SetError(val message: String) : ChatIntent()
     data class SelectPage(val page: AppPage) : ChatIntent()
+    object OpenSettingsScreen : ChatIntent()
+    object CloseSettingsScreen : ChatIntent()
 }
