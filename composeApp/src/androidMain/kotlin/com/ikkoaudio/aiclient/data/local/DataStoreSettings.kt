@@ -1,6 +1,6 @@
 package com.ikkoaudio.aiclient.data.local
 
-import android.content.Context
+import com.ikkoaudio.aiclient.feature.chat.ChatState
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -13,10 +13,9 @@ class DataStoreSettings(private val dataStore: DataStore<Preferences>) : Setting
 
     companion object {
         private val MEMORY_ID = stringPreferencesKey("memory_id")
-        private const val DEFAULT_BASE_URL = "http://192.168.100.137:8080"
     }
 
-    override fun getApiBaseUrl(): Flow<String> = flowOf(DEFAULT_BASE_URL)
+    override fun getApiBaseUrl(): Flow<String> = flowOf(ChatState.Defaults.API_BASE_URL)
 
     override suspend fun setApiBaseUrl(url: String) {
         // API URL is developer-only; users cannot change it

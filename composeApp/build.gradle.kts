@@ -11,7 +11,7 @@ plugins {
 }
 
 /** In-app and Android `versionName`; reflected in generated [com.ikkoaudio.aiclient.AppVersion]. */
-val appVersionName = "2.2"
+val appVersionName = "2.2.1"
 
 val generateAppVersion by tasks.registering {
     val outDir = layout.buildDirectory.dir("generated/kotlin/appversion")
@@ -84,6 +84,7 @@ kotlin {
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.content.negotiation)
             implementation(libs.ktor.client.logging)
+            implementation(libs.ktor.client.websockets)
             implementation(libs.ktor.serialization.kotlinx.json)
             }
         }

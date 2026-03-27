@@ -1,5 +1,6 @@
 package com.ikkoaudio.aiclient.data.remote.api
 
+import com.ikkoaudio.aiclient.core.audio.PcmPlayback
 import com.ikkoaudio.aiclient.domain.model.LlmModel
 import kotlinx.coroutines.flow.Flow
 
@@ -22,5 +23,14 @@ interface AiApi {
 
     suspend fun textToSpeech(baseUrl: String, text: String): Result<ByteArray>
 
-    suspend fun asrLlmTtsChat(baseUrl: String, fileBytes: ByteArray, fileName: String, memoryId: String?): Result<ByteArray>
+    suspend fun asrLlmTtsChat(baseUrl: String, fileBytes: ByteArray, fileName: String, memoryId: String?): Result<PcmPlayback>
+
+    /** Voice chat: send recorded audio over WebSocket; response is PCM (same parsing as HTTP). */
+    suspend fun asrLlmTtsChatWebSocket(wsUrl: String, fileBytes: ByteArray, fileName: String, memoryId: String?): Result<PcmPlayback>
+
+    /**
+     * Opens a WebSocket, verifies HTTP 101 upgrade, then closes. Does not send app payload.
+     * On success returns a short detail string; on failure the exception describes the HTTP error (e.g. 500).
+     */
+    suspend fun checkVoiceChatWebSocketHandshake(wsUrl: String): Result<String>
 }

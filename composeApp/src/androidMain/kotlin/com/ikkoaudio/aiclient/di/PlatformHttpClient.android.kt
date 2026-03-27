@@ -31,4 +31,5 @@ actual fun createHttpClient(): HttpClient = HttpClient(io.ktor.client.engine.okh
     install(Logging) {
         level = LogLevel.INFO
     }
+    installAppWebSockets()
 }

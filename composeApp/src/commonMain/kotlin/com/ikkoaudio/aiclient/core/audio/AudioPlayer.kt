@@ -5,7 +5,7 @@ package com.ikkoaudio.aiclient.core.audio
  * Plays PCM/audio bytes through the device speaker.
  */
 interface AudioPlayer {
-    suspend fun play(audioData: ByteArray)
+    suspend fun play(audioData: ByteArray, format: PcmAudioFormat = PcmAudioFormat.DefaultTts)
     fun stop()
 }
 

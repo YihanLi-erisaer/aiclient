@@ -1,5 +1,6 @@
 package com.ikkoaudio.aiclient.data.repository
 
+import com.ikkoaudio.aiclient.core.audio.PcmPlayback
 import com.ikkoaudio.aiclient.data.remote.api.AiApi
 import com.ikkoaudio.aiclient.domain.model.LlmModel
 import co.touchlab.kermit.Logger
@@ -32,6 +33,12 @@ class AiRepository(
     suspend fun textToSpeech(baseUrl: String, text: String): Result<ByteArray> =
         api.textToSpeech(baseUrl, text)
 
-    suspend fun asrLlmTtsChat(baseUrl: String, fileBytes: ByteArray, fileName: String, memoryId: String?): Result<ByteArray> =
+    suspend fun asrLlmTtsChat(baseUrl: String, fileBytes: ByteArray, fileName: String, memoryId: String?): Result<PcmPlayback> =
         api.asrLlmTtsChat(baseUrl, fileBytes, fileName, memoryId)
+
+    suspend fun asrLlmTtsChatWebSocket(wsUrl: String, fileBytes: ByteArray, fileName: String, memoryId: String?): Result<PcmPlayback> =
+        api.asrLlmTtsChatWebSocket(wsUrl, fileBytes, fileName, memoryId)
+
+    suspend fun checkVoiceChatWebSocketHandshake(wsUrl: String): Result<String> =
+        api.checkVoiceChatWebSocketHandshake(wsUrl)
 }

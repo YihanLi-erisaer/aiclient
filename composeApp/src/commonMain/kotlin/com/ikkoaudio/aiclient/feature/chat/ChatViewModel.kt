@@ -33,6 +33,7 @@ class ChatViewModel(
 
     init {
         scope.launch {
+            // Keeps [ChatState.apiBaseUrl] in sync with settings; use [ChatState.Defaults.API_BASE_URL] as single source.
             settingsStore.getApiBaseUrl().collect { url ->
                 _state.update { it.copy(apiBaseUrl = url) }
             }
@@ -48,18 +49,13 @@ class ChatViewModel(
         when (intent) {
             is ChatIntent.SendMessage -> sendMessage(intent.text)
             is ChatIntent.UpdateInput -> _state.update { it.copy(inputText = intent.text) }
-            ChatIntent.LoadModels -> loadModels()
-            is ChatIntent.SelectModel -> _state.update { it.copy(selectedModel = intent.model) }
-            is ChatIntent.SetMemoryId -> scope.launch {
-                settingsStore.setMemoryId(intent.id)
-                _state.update { it.copy(memoryId = intent.id) }
-            }
             is ChatIntent.SendAudioFile -> sendAudioFile(intent.bytes, intent.fileName)
             is ChatIntent.SendImage -> sendImage(intent.bytes, intent.fileName, intent.message)
             ChatIntent.StartRecording -> startRecording()
             ChatIntent.StopRecording -> stopRecordingAndTranscribe()
             ChatIntent.StartVoiceChat -> startVoiceChat()
             ChatIntent.StopVoiceChat -> stopVoiceChat()
+            ChatIntent.CheckVoiceChatWebSocketHandshake -> checkVoiceChatWebSocketHandshake()
             ChatIntent.TextToSpeech -> textToSpeech()
             ChatIntent.ClearError -> _state.update { it.copy(error = null) }
             is ChatIntent.SetError -> _state.update { it.copy(error = intent.message) }
@@ -183,33 +179,13 @@ class ChatViewModel(
         return !inUrlContext
     }
 
-    private fun loadModels() {
-        scope.launch {
-            _state.update { it.copy(isLoading = true, error = null) }
-            repository.getModels(_state.value.apiBaseUrl)
-                .onSuccess { models ->
-                    _state.update {
-                        it.copy(
-                            models = models,
-                            selectedModel = models.firstOrNull()?.name ?: it.selectedModel,
-                            isLoading = false
-                        )
-                    }
-                }
-                .onFailure { err ->
-                    logger.e { "Load models failed: ${err.message}" }
-                    _state.update { it.copy(error = err.message, isLoading = false) }
-                }
-        }
-    }
-
     private fun sendAudioFile(bytes: ByteArray, fileName: String) {
         scope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
             repository.asrLlmTtsChat(_state.value.apiBaseUrl, bytes, fileName, _state.value.memoryId)
-                .onSuccess { audioBytes ->
+                .onSuccess { playback ->
                     _state.update { it.copy(isLoading = false) }
-                    audioPlayer.play(audioBytes)
+                    audioPlayer.play(playback.pcm, playback.format)
                 }
                 .onFailure { err ->
                     logger.e { "ASR+LLM+TTS failed: ${err.message}" }
@@ -262,17 +238,41 @@ class ChatViewModel(
             _state.update { it.copy(isLoading = true, error = null) }
             val memoryId = ensureMemoryId()
             val combinedResult =
-                repository.asrLlmTtsChat(_state.value.apiBaseUrl, bytes, "recording.wav", memoryId)
+                repository.asrLlmTtsChatWebSocket(_state.value.voiceChatWebSocketUrl, bytes, "recording.wav", memoryId)
             if (combinedResult.isSuccess) {
-                val audioBytes = combinedResult.getOrThrow()
+                val playback = combinedResult.getOrThrow()
                 _state.update { it.copy(isLoading = false) }
-                audioPlayer.play(audioBytes)
+                audioPlayer.play(playback.pcm, playback.format)
                 return@launch
             }
 
             val err = combinedResult.exceptionOrNull()
             logger.e { "Voice chat failed: ${err?.message}" }
             _state.update { it.copy(error = err?.message ?: "Voice chat failed", isLoading = false) }
+        }
+    }
+
+    private fun checkVoiceChatWebSocketHandshake() {
+        scope.launch {
+            val url = _state.value.voiceChatWebSocketUrl
+            _state.update { it.copy(voiceChatWebSocketHandshake = VoiceChatWebSocketHandshakeState.Checking) }
+            repository.checkVoiceChatWebSocketHandshake(url)
+                .onSuccess { detail ->
+                    logger.i { "WS handshake OK: $url — $detail" }
+                    _state.update {
+                        it.copy(voiceChatWebSocketHandshake = VoiceChatWebSocketHandshakeState.Ok(detail))
+                    }
+                }
+                .onFailure { e ->
+                    logger.e { "WS handshake failed: ${e.message}" }
+                    _state.update {
+                        it.copy(
+                            voiceChatWebSocketHandshake = VoiceChatWebSocketHandshakeState.Failed(
+                                e.message ?: e.toString()
+                            )
+                        )
+                    }
+                }
         }
     }
 

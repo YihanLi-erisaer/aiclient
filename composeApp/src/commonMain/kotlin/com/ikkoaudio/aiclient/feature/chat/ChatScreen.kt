@@ -222,7 +222,6 @@ fun ChatScreen(viewModel: ChatViewModel) {
             ) {
                 SettingsFullScreen(
                     state = state,
-                    viewModel = viewModel,
                     onClose = { viewModel.dispatch(ChatIntent.CloseSettingsScreen) }
                 )
             }
@@ -439,7 +438,7 @@ private fun RightSidebarNav(
             onClick = { onSelectPage(AppPage.TTS) }
         )
         ModeNavButton(
-            label = "Settings",
+            label = "⚙  Settings",
             selected = settingsScreenVisible,
             onClick = onOpenSettings
         )

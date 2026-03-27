@@ -1,5 +1,6 @@
 package com.ikkoaudio.aiclient.data.local
 
+import com.ikkoaudio.aiclient.feature.chat.ChatState
 import kotlinx.browser.localStorage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -9,7 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
  */
 class WebSettingsStore : SettingsStore {
 
-    private val baseUrl = MutableStateFlow("http://192.168.100.137:8080")
+    private val baseUrl = MutableStateFlow(ChatState.Defaults.API_BASE_URL)
 
     private val memoryId = MutableStateFlow<String?>(readStoredMemoryId())
 

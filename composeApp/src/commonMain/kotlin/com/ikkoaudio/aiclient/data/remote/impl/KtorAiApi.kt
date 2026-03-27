@@ -1,5 +1,7 @@
 package com.ikkoaudio.aiclient.data.remote.impl
 
+import com.ikkoaudio.aiclient.core.audio.PcmAudioFormat
+import com.ikkoaudio.aiclient.core.audio.PcmPlayback
 import com.ikkoaudio.aiclient.data.remote.api.AiApi
 import com.ikkoaudio.aiclient.data.remote.dto.ChatResponse
 import com.ikkoaudio.aiclient.data.remote.dto.ModelItem
@@ -9,16 +11,27 @@ import com.ikkoaudio.aiclient.domain.model.LlmModel
 import co.touchlab.kermit.Logger
 import io.ktor.client.*
 import io.ktor.client.call.*
+import io.ktor.client.plugins.websocket.webSocket
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.http.content.*
 import io.ktor.utils.io.*
+import io.ktor.websocket.CloseReason
+import io.ktor.websocket.Frame
+import io.ktor.websocket.close
+import io.ktor.websocket.readBytes
+import io.ktor.websocket.readText
+import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -231,7 +244,7 @@ class KtorAiApi(
         fileBytes: ByteArray,
         fileName: String,
         memoryId: String?
-    ): Result<ByteArray> {
+    ): Result<PcmPlayback> {
         return runCatching {
             val base = normalizeUrl(baseUrl)
             val url = "$base/api/asr_llm_tts/chat"
@@ -262,25 +275,182 @@ class KtorAiApi(
                 else -> {
                     val bytes = response.body<ByteArray>()
                     logger.i { "ASR_LLM_TTS audio bytes=${bytes.size}" }
-                    bytes
+                    parseBinaryPcmWithOptionalMetaPrefix(bytes)
                 }
             }
         }.onFailure { logger.e { "ASR_LLM_TTS chat failed: ${it.message}" } }
     }
 
-    private suspend fun resolveAudioFromText(baseUrl: String, rawBody: String): ByteArray {
+    override suspend fun asrLlmTtsChatWebSocket(
+        wsUrl: String,
+        fileBytes: ByteArray,
+        fileName: String,
+        memoryId: String?
+    ): Result<PcmPlayback> {
+        return runCatching {
+            val url = wsUrl.trim()
+            logger.i {
+                "ASR_LLM_TTS WebSocket -> $url, bytes=${fileBytes.size}, file=$fileName"
+            }
+            val textChunks = mutableListOf<String>()
+            val binaryChunks = mutableListOf<ByteArray>()
+            var closeCode: Int? = null
+            var closeReason: String? = null
+            withTimeout(120_000L) {
+                client.webSocket(urlString = url) {
+                    // Aligned with browser reference:
+                    //   ws.binaryType = "arraybuffer"  -> only affects onmessage shape (Blob vs ArrayBuffer), not send().
+                    //   onopen -> await file.arrayBuffer(); ws.send(arrayBuffer)  -> one binary frame, full payload.
+                    // Ktor: webSocket{} runs after HTTP 101 (= onopen). fileBytes == arrayBuffer bytes.
+                    send(Frame.Binary(true, fileBytes))
+                    try {
+                        while (true) {
+                            when (val frame = incoming.receive()) {
+                                is Frame.Binary -> binaryChunks.add(frame.readBytes())
+                                is Frame.Text -> textChunks.add(frame.readText())
+                                is Frame.Ping -> send(Frame.Pong(frame.readBytes()))
+                                is Frame.Close -> {
+                                    val payload = frame.readBytes()
+                                    if (payload.size >= 2) {
+                                        closeCode =
+                                            ((payload[0].toInt() and 0xFF) shl 8) or (payload[1].toInt() and 0xFF)
+                                    }
+                                    if (payload.size > 2) {
+                                        closeReason = payload.decodeToString(2, payload.size)
+                                    }
+                                    break
+                                }
+                                else -> {}
+                            }
+                        }
+                    } catch (e: ClosedReceiveChannelException) {
+                        logger.d { "ASR_LLM_TTS WebSocket incoming closed (no more frames): ${e.message}" }
+                    }
+                }
+            }
+            if (textChunks.isEmpty() && binaryChunks.isEmpty()) {
+                val detail = buildString {
+                    append("no Text/Binary frames before close")
+                    if (closeCode != null) append("; close code=").append(closeCode)
+                    if (!closeReason.isNullOrBlank()) append(" reason=").append(closeReason)
+                }
+                logger.e { "ASR_LLM_TTS WebSocket empty response: $detail" }
+                throw IllegalStateException(
+                    "WebSocket voice chat returned empty response ($detail). " +
+                        "Handshake likely succeeded but the server sent no Text/Binary before closing — " +
+                        "check backend sends PCM (or audio_meta) before disconnecting; also verify server logs."
+                )
+            }
+            logger.i {
+                "ASR_LLM_TTS WebSocket merged textFrames=${textChunks.size}, binFrames=${binaryChunks.size}"
+            }
+            val merged = mergeWsResponse(textChunks, binaryChunks)
+            logger.i { "ASR_LLM_TTS WebSocket merged bytes=${merged.size}" }
+            parseBinaryPcmWithOptionalMetaPrefix(merged)
+        }.onFailure { logger.e { "ASR_LLM_TTS WebSocket failed: ${it.message}" } }
+    }
+
+    override suspend fun checkVoiceChatWebSocketHandshake(wsUrl: String): Result<String> {
+        return runCatching {
+            val url = wsUrl.trim()
+            logger.i { "WS handshake probe -> $url" }
+            client.webSocket(urlString = url) {
+                close(
+                    CloseReason(
+                        code = CloseReason.Codes.NORMAL,
+                        message = "handshake_probe"
+                    )
+                )
+            }
+            "HTTP 101 Switching Protocols"
+        }.onFailure { logger.e { "WS handshake probe failed: ${it.message}" } }
+    }
+
+    private fun mergeWsResponse(textParts: List<String>, binaryParts: List<ByteArray>): ByteArray {
+        val text = textParts.joinToString("\n").trim()
+        if (text.isEmpty()) {
+            return binaryParts.fold(ByteArray(0)) { acc, b -> acc + b }
+        }
+        if (!text.startsWith("{")) {
+            val textBytes = text.encodeToByteArray()
+            val tail = binaryParts.fold(ByteArray(0)) { acc, b -> acc + b }
+            return if (tail.isEmpty()) textBytes else textBytes + "\n".encodeToByteArray() + tail
+        }
+        val head = text.encodeToByteArray()
+        val nl = "\n".encodeToByteArray()
+        val tail = binaryParts.fold(ByteArray(0)) { acc, b -> acc + b }
+        return head + nl + tail
+    }
+
+    /**
+     * Raw body: optional first line `{"type":"audio_meta",...}` then newline, remainder is PCM_S16LE.
+     * If there is no prefix, assumes [PcmAudioFormat.VoiceChatPcm] (e.g. 22050 Hz mono).
+     */
+    private fun parseBinaryPcmWithOptionalMetaPrefix(bytes: ByteArray): PcmPlayback {
+        if (bytes.isEmpty() || bytes[0] != '{'.code.toByte()) {
+            return PcmPlayback(bytes, PcmAudioFormat.VoiceChatPcm)
+        }
+        val nl = bytes.indexOf('\n'.code.toByte())
+        if (nl <= 0) {
+            return PcmPlayback(bytes, PcmAudioFormat.VoiceChatPcm)
+        }
+        val line = bytes.decodeToString(0, nl).trimEnd('\r')
+        if (!line.startsWith("{")) {
+            return PcmPlayback(bytes, PcmAudioFormat.VoiceChatPcm)
+        }
+        return runCatching {
+            val obj = Json.parseToJsonElement(line).jsonObject
+            if (obj["type"]?.jsonPrimitive?.content != "audio_meta") {
+                return PcmPlayback(bytes, PcmAudioFormat.VoiceChatPcm)
+            }
+            val pcm = bytes.copyOfRange(nl + 1, bytes.size)
+            PcmPlayback(pcm, pcmFormatFromAudioMeta(obj))
+        }.getOrElse { PcmPlayback(bytes, PcmAudioFormat.VoiceChatPcm) }
+    }
+
+    private fun pcmFormatFromAudioMeta(obj: JsonObject): PcmAudioFormat {
+        val sr = jsonInt(obj, "sampleRate", 22050)
+        val ch = jsonInt(obj, "channels", 1)
+        val fmt = obj["format"]?.jsonPrimitive?.content ?: "PCM_S16LE"
+        return PcmAudioFormat(sampleRate = sr, channels = ch, format = fmt)
+    }
+
+    private fun jsonInt(obj: JsonObject, key: String, default: Int): Int {
+        val prim = obj[key]?.jsonPrimitive ?: return default
+        val content = prim.content
+        content.toIntOrNull()?.let { return it }
+        content.toDoubleOrNull()?.toInt()?.let { return it }
+        return default
+    }
+
+    @OptIn(ExperimentalEncodingApi::class)
+    private suspend fun resolveAudioFromText(baseUrl: String, rawBody: String): PcmPlayback {
         val trimmed = rawBody.trim().trim('"')
         if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
             logger.i { "ASR_LLM_TTS downloading audio from absolute url: $trimmed" }
-            return client.get(trimmed).body()
+            val bytes = client.get(trimmed).body<ByteArray>()
+            return PcmPlayback(bytes, PcmAudioFormat.DefaultTts)
         }
         if (trimmed.startsWith("/")) {
             val full = "$baseUrl$trimmed"
             logger.i { "ASR_LLM_TTS downloading audio from relative url: $full" }
-            return client.get(full).body()
+            val bytes = client.get(full).body<ByteArray>()
+            return PcmPlayback(bytes, PcmAudioFormat.DefaultTts)
         }
         if (trimmed.startsWith("{")) {
             val json = Json.parseToJsonElement(trimmed).jsonObject
+            if (json["type"]?.jsonPrimitive?.content == "audio_meta") {
+                val b64 = listOf("audio", "pcm", "pcmBase64", "audio_base64")
+                    .mapNotNull { key ->
+                        json[key]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+                    }
+                    .firstOrNull()
+                if (b64 != null) {
+                    val pcm = Base64.decode(b64)
+                    logger.i { "ASR_LLM_TTS decoded base64 PCM bytes=${pcm.size}" }
+                    return PcmPlayback(pcm, pcmFormatFromAudioMeta(json))
+                }
+            }
             val candidate = listOf("url", "audioUrl", "audio_url")
                 .mapNotNull { key ->
                     runCatching { json[key]?.jsonPrimitive?.content }.getOrNull()
@@ -290,7 +460,8 @@ class KtorAiApi(
             if (!candidate.isNullOrBlank()) {
                 val full = if (candidate.startsWith("http")) candidate else "$baseUrl${if (candidate.startsWith("/")) "" else "/"}$candidate"
                 logger.i { "ASR_LLM_TTS downloading audio from json url: $full" }
-                return client.get(full).body()
+                val bytes = client.get(full).body<ByteArray>()
+                return PcmPlayback(bytes, PcmAudioFormat.DefaultTts)
             }
         }
         throw IllegalStateException("ASR_LLM_TTS did not return audio or audio url: ${trimmed.take(160)}")

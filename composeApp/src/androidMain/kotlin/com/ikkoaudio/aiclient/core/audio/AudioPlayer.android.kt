@@ -6,21 +6,18 @@ import android.media.AudioTrack
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-import java.io.File
-import java.io.FileOutputStream
 
 actual class PlatformAudioPlayer : AudioPlayer {
 
     private var audioTrack: AudioTrack? = null
 
-    override suspend fun play(audioData: ByteArray) = withContext(Dispatchers.IO) {
-        // Try MediaRecorder-compatible format (m4a) first - write to temp file and play via MediaPlayer
-        val tempFile = File.createTempFile("audio_", ".pcm").apply { deleteOnExit() }
-        FileOutputStream(tempFile).use { it.write(audioData) }
-
-        // Assume PCM 16-bit 16kHz mono (common TTS format) or try raw playback
-        val sampleRate = 16000
-        val channelConfig = AudioFormat.CHANNEL_OUT_MONO
+    override suspend fun play(audioData: ByteArray, format: PcmAudioFormat) = withContext(Dispatchers.IO) {
+        val sampleRate = format.sampleRate
+        val channelConfig = when (format.channels) {
+            1 -> AudioFormat.CHANNEL_OUT_MONO
+            2 -> AudioFormat.CHANNEL_OUT_STEREO
+            else -> error("Unsupported channel count: ${format.channels}")
+        }
         val encoding = AudioFormat.ENCODING_PCM_16BIT
         val bufferSize = AudioTrack.getMinBufferSize(sampleRate, channelConfig, encoding)
 
@@ -50,11 +47,12 @@ actual class PlatformAudioPlayer : AudioPlayer {
             offset += written
         }
         track.flush()
-        delay((audioData.size * 1000L) / (sampleRate * 2)) // Approximate play duration
+        val bytesPerFrame = 2 * format.channels
+        val frames = audioData.size / bytesPerFrame
+        delay((frames * 1000L) / sampleRate)
         track.stop()
         track.release()
         audioTrack = null
-        tempFile.delete()
         Unit
     }
 

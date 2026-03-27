@@ -1,17 +1,16 @@
 package com.ikkoaudio.aiclient.feature.chat
 
- sealed class ChatIntent {
+sealed class ChatIntent {
     data class SendMessage(val text: String) : ChatIntent()
     data class UpdateInput(val text: String) : ChatIntent()
-    object LoadModels : ChatIntent()
-    data class SelectModel(val model: String) : ChatIntent()
-    data class SetMemoryId(val id: String?) : ChatIntent()
     data class SendAudioFile(val bytes: ByteArray, val fileName: String) : ChatIntent()
     data class SendImage(val bytes: ByteArray, val fileName: String, val message: String) : ChatIntent()
     object StartRecording : ChatIntent()
     object StopRecording : ChatIntent()
     object StartVoiceChat : ChatIntent()  // Record -> ASR+LLM+TTS -> Play
     object StopVoiceChat : ChatIntent()
+    /** Probe [ChatState.voiceChatWebSocketUrl] for HTTP 101 WebSocket handshake. */
+    object CheckVoiceChatWebSocketHandshake : ChatIntent()
     object TextToSpeech : ChatIntent()
     object ClearError : ChatIntent()
     data class SetError(val message: String) : ChatIntent()

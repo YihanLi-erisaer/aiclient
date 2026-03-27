@@ -17,4 +17,5 @@ actual fun createHttpClient(): HttpClient = HttpClient(CIO) {
     install(Logging) {
         level = LogLevel.INFO
     }
+    installAppWebSockets()
 }

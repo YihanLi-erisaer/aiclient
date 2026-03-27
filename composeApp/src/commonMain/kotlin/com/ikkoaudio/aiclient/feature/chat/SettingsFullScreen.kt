@@ -11,9 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -24,7 +22,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ikkoaudio.aiclient.AppVersion
 
@@ -32,7 +29,6 @@ import com.ikkoaudio.aiclient.AppVersion
 @Composable
 fun SettingsFullScreen(
     state: ChatState,
-    viewModel: ChatViewModel,
     onClose: () -> Unit
 ) {
     Surface(
@@ -64,31 +60,12 @@ fun SettingsFullScreen(
             ) {
                 OutlinedTextField(
                     value = state.memoryId ?: "",
-                    onValueChange = { viewModel.dispatch(ChatIntent.SetMemoryId(it.ifEmpty { null })) },
+                    onValueChange = {},
+                    readOnly = true,
                     label = { Text("Memory ID") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
-                Button(
-                    onClick = { viewModel.dispatch(ChatIntent.LoadModels) },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Load Models")
-                }
-                state.models.forEach { model ->
-                    FilterChip(
-                        selected = model.name == state.selectedModel,
-                        onClick = { viewModel.dispatch(ChatIntent.SelectModel(model.name)) },
-                        label = {
-                            Text(
-                                model.name,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(
                     text = "App version",

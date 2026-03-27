@@ -12,6 +12,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -35,6 +36,34 @@ fun VoiceChatBody(state: ChatState, viewModel: ChatViewModel, modifier: Modifier
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            OutlinedButton(
+                onClick = { viewModel.dispatch(ChatIntent.CheckVoiceChatWebSocketHandshake) },
+                enabled = state.voiceChatWebSocketHandshake !is VoiceChatWebSocketHandshakeState.Checking,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    when (state.voiceChatWebSocketHandshake) {
+                        is VoiceChatWebSocketHandshakeState.Checking -> "Checking WebSocket…"
+                        else -> "Check WebSocket handshake (HTTP 101)"
+                    }
+                )
+            }
+            when (val h = state.voiceChatWebSocketHandshake) {
+                is VoiceChatWebSocketHandshakeState.Ok -> Text(
+                    text = "Handshake OK: ${h.detail}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+                is VoiceChatWebSocketHandshakeState.Failed -> Text(
+                    text = "Handshake failed: ${h.message}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+                else -> { }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
             if (state.isLoading) {
                 CircularProgressIndicator()
                 Spacer(modifier = Modifier.height(16.dp))
