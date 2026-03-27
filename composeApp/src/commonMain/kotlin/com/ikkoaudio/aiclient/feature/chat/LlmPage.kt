@@ -228,8 +228,55 @@ private fun MarkdownText(
     )
 }
 
+/**
+ * Fixes common LLM / mixed CJK+Latin spacing glitches before Markdown parsing:
+ * - spurious space after apostrophe (`It' s` → `It's`)
+ * - missing space after `.!?` before a letter (`again.How` → `again. How`)
+ * - missing space after `,` before a letter (`share,or` → `share, or`)
+ * - glued function words (`niceto` → `nice to`, etc.)
+ */
+private fun fixAssistantEnglishSpacing(text: String): String {
+    var s = text
+    // Wrong space after apostrophe (straight or curly) before a letter
+    s = s.replace(Regex("""([‘''])\s+([a-zA-Z])"""), "$1$2")
+    // Contractions like It's + so / nice glued: It'sso -> It's so
+    s = s.replace(Regex("""\b([A-Za-z]+'[sS])([a-z]{2,})\b""")) { m ->
+        val a = m.groupValues[1]
+        val b = m.groupValues[2]
+        when {
+            b.equals("so", ignoreCase = true) -> "$a $b"
+            b.equals("nice", ignoreCase = true) -> "$a $b"
+            else -> m.value
+        }
+    }
+    // Missing space after sentence punctuation before Latin letter
+    s = s.replace(Regex("""([.!?])([A-Za-z])"""), "$1 $2")
+    // Missing space after comma before letter (share,or)
+    s = s.replace(Regex("""(,)([A-Za-z])"""), "$1 $2")
+    // Known glued English tokens (LLM often drops spaces before "to", "so", "on")
+    val glued = listOf(
+        Regex("""\bniceto\b""", RegexOption.IGNORE_CASE) to "nice to",
+        Regex("""\bgoingso\b""", RegexOption.IGNORE_CASE) to "going so",
+        Regex("""\banythingon\b""", RegexOption.IGNORE_CASE) to "anything on",
+        Regex("""\bliketo\b""", RegexOption.IGNORE_CASE) to "like to",
+        Regex("""\bhearfrom\b""", RegexOption.IGNORE_CASE) to "hear from",
+        Regex("""\byouagain\b""", RegexOption.IGNORE_CASE) to "you again",
+        Regex("""\byourday\b""", RegexOption.IGNORE_CASE) to "your day",
+        Regex("""\bdaygoing\b""", RegexOption.IGNORE_CASE) to "day going",
+        Regex("""\bmindyou\b""", RegexOption.IGNORE_CASE) to "mind you",
+        Regex("""\bwouldyou\b""", RegexOption.IGNORE_CASE) to "would you",
+        Regex("""\bfromyou\b""", RegexOption.IGNORE_CASE) to "from you",
+    )
+    for ((pattern, replacement) in glued) {
+        s = pattern.replace(s, replacement)
+    }
+    // Split name wrongly spaced (reported case)
+    s = s.replace(Regex("""\bEri\s+aser\b""", RegexOption.IGNORE_CASE), "Erisaer")
+    return s
+}
+
 private fun normalizeMarkdownForRendering(content: String): String {
-    return content
+    return fixAssistantEnglishSpacing(content)
         .replace(Regex("""<br\s*/?>""", RegexOption.IGNORE_CASE), "\n")
         // Insert newline before # header when embedded in line (e.g. "text# 什么是API" -> "text\n# 什么是API")
         .replace(Regex("""([^\n])(#{1,6}\s)"""), "$1\n$2")
