@@ -2,8 +2,9 @@ package com.ikkoaudio.aiclient
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
-import androidx.compose.runtime.*
-import androidx.compose.ui.text.font.Font
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import com.ikkoaudio.aiclient.di.AppModule
@@ -15,9 +16,18 @@ import aiclient.composeapp.generated.resources.*
 
 @Composable
 fun App() {
-    // Noto Sans SC includes Latin + Simplified Chinese; use as primary for CJK support
-    val appFont = Font(Res.font.NotoSansSC_Regular, FontWeight.Normal)
-    val appFontFamily = remember(appFont) { FontFamily(appFont) }
+    // Web: only sans in FontFamily; emoji is registered via EmojiFontBootstrap + Resolver.preload.
+    // Android: sans + emoji in FontFamily works as glyph fallback.
+    val sansFont = Font(Res.font.NotoSansSC_Regular, FontWeight.Normal)
+    val emojiFromResource = Font(Res.font.NotoEmojiFallback, FontWeight.Normal)
+    val appFontFamily = remember(sansFont, emojiFromResource) {
+        if (isSkikoWebTarget) {
+            FontFamily(sansFont)
+        } else {
+            FontFamily(sansFont, emojiFromResource)
+        }
+    }
+
     val defaultTypography = Typography()
     val appTypography = remember(appFontFamily) {
         Typography(
@@ -39,11 +49,14 @@ fun App() {
         )
     }
     val scope = rememberCoroutineScope()
-    MaterialTheme(typography = appTypography) {
-        val viewModel: ChatViewModel = remember(scope) {
-            AppModule.createChatViewModel(scope)
+
+    EmojiFontBootstrap {
+        MaterialTheme(typography = appTypography) {
+            val viewModel: ChatViewModel = remember(scope) {
+                AppModule.createChatViewModel(scope)
+            }
+            ChatScreen(viewModel = viewModel)
         }
-        ChatScreen(viewModel = viewModel)
     }
 }
 
