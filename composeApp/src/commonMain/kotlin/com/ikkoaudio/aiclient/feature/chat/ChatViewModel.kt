@@ -68,6 +68,14 @@ class ChatViewModel(
             }
             ChatIntent.OpenSettingsScreen -> _state.update { it.copy(settingsScreenVisible = true) }
             ChatIntent.CloseSettingsScreen -> _state.update { it.copy(settingsScreenVisible = false) }
+            is ChatIntent.ScrollChatToMessage -> _state.update {
+                it.copy(
+                    scrollToMessageId = intent.messageId,
+                    selectedPage = AppPage.LLM,
+                    settingsScreenVisible = false
+                )
+            }
+            ChatIntent.ClearScrollToMessage -> _state.update { it.copy(scrollToMessageId = null) }
         }
     }
 

@@ -40,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
@@ -109,6 +110,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                         Box(modifier = Modifier.fillMaxSize()) {
                             LeftSidebarChrome(
                                 state = state,
+                                viewModel = viewModel,
                                 expanded = leftOpen,
                                 onToggle = {
                                     if (leftOpen) leftOpen = false
@@ -165,6 +167,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                         Box(modifier = Modifier.fillMaxSize()) {
                             LeftSidebarChrome(
                                 state = state,
+                                viewModel = viewModel,
                                 expanded = leftOpen,
                                 onToggle = {
                                     if (leftOpen) leftOpen = false
@@ -230,6 +233,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
 @Composable
 private fun LeftSidebarChrome(
     state: ChatState,
+    viewModel: ChatViewModel,
     expanded: Boolean,
     onToggle: () -> Unit,
     contentPaddingEnd: Dp
@@ -242,7 +246,7 @@ private fun LeftSidebarChrome(
                     .fillMaxSize()
                     .padding(end = contentPaddingEnd)
             ) {
-                LeftSidebarContent(state = state)
+                LeftSidebarContent(state = state, viewModel = viewModel)
             }
         }
         Box(
@@ -324,34 +328,48 @@ private fun InnerEdgeMenuIconButton(
 }
 
 @Composable
-private fun LeftSidebarContent(state: ChatState) {
+private fun LeftSidebarContent(state: ChatState, viewModel: ChatViewModel) {
     when (state.selectedPage) {
-        AppPage.LLM -> ChatHistorySidebar(messages = state.messages, isVoicePage = false)
-        AppPage.VOICECHAT -> ChatHistorySidebar(messages = state.messages, isVoicePage = true)
+        AppPage.LLM -> ChatHistorySidebar(
+            messages = state.messages,
+            isVoicePage = false,
+            onSelectUserMessage = { viewModel.dispatch(ChatIntent.ScrollChatToMessage(it)) }
+        )
+        AppPage.VOICECHAT -> ChatHistorySidebar(
+            messages = state.messages,
+            isVoicePage = true,
+            onSelectUserMessage = { viewModel.dispatch(ChatIntent.ScrollChatToMessage(it)) }
+        )
         AppPage.ASR -> AsrLeftPanel(state)
         AppPage.TTS -> TtsLeftPanel()
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ChatHistorySidebar(messages: List<ChatMessageUi>, isVoicePage: Boolean) {
+private fun ChatHistorySidebar(
+    messages: List<ChatMessageUi>,
+    isVoicePage: Boolean,
+    onSelectUserMessage: (String) -> Unit
+) {
+    val userOnly = remember(messages) { messages.filter { it.role == "user" } }
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
     ) {
         Text(
-            text = "Chat History",
+            text = "Your questions",
             style = MaterialTheme.typography.titleMedium,
             color = ChatLayoutTokens.NavText
         )
         Spacer(modifier = Modifier.height(12.dp))
-        if (messages.isEmpty()) {
+        if (userOnly.isEmpty()) {
             Text(
                 text = if (isVoicePage) {
-                    "Use Hold to Chat in the center. Text conversations from the LLM tab will show up here."
+                    "No text questions yet. Use LLM tab to chat, or Hold to Chat here."
                 } else {
-                    "No messages yet. Enter your question below to start."
+                    "No questions yet. Enter your question in the center to start."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -361,26 +379,23 @@ private fun ChatHistorySidebar(messages: List<ChatMessageUi>, isVoicePage: Boole
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(messages, key = { it.id }) { msg ->
-                    val label = if (msg.role == "user") "You" else "Assistant"
+                items(userOnly, key = { it.id }) { msg ->
                     Surface(
+                        onClick = { onSelectUserMessage(msg.id) },
                         shape = RoundedCornerShape(8.dp),
                         color = ChatLayoutTokens.NavInactiveBackground,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(Modifier.padding(10.dp)) {
-                            Text(
-                                text = label,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Text(
-                                text = msg.content.ifBlank { "…" },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = ChatLayoutTokens.NavText,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
+                        Text(
+                            text = msg.content.ifBlank { "…" },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = ChatLayoutTokens.NavText,
+                            maxLines = 4,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(10.dp)
+                        )
                     }
                 }
             }

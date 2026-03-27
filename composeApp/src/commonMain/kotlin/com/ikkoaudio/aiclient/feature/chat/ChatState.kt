@@ -22,7 +22,9 @@ data class ChatState(
     val isRecording: Boolean = false,
     val isVoiceChat: Boolean = false,  // true = full ASR->LLM->TTS pipeline
     val selectedPage: AppPage = AppPage.VOICECHAT,
-    val settingsScreenVisible: Boolean = false
+    val settingsScreenVisible: Boolean = false,
+    /** When set, [LlmChatBody] scrolls to this message then clears (sidebar history tap). */
+    val scrollToMessageId: String? = null
 )
 
 data class ChatMessageUi(

@@ -18,4 +18,6 @@ package com.ikkoaudio.aiclient.feature.chat
     data class SelectPage(val page: AppPage) : ChatIntent()
     object OpenSettingsScreen : ChatIntent()
     object CloseSettingsScreen : ChatIntent()
+    data class ScrollChatToMessage(val messageId: String) : ChatIntent()
+    object ClearScrollToMessage : ChatIntent()
 }

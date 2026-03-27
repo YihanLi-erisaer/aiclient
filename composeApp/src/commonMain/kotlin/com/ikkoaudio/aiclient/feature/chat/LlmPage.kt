@@ -27,7 +27,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -412,8 +415,20 @@ fun LlmPage(state: ChatState, viewModel: ChatViewModel) {
 @Composable
 fun LlmChatBody(state: ChatState, viewModel: ChatViewModel, modifier: Modifier = Modifier) {
     val listState = rememberLazyListState()
+    var prevMessageCount by remember { mutableStateOf(0) }
     LaunchedEffect(state.messages.size) {
-        if (state.messages.isNotEmpty()) listState.animateScrollToItem(state.messages.size - 1)
+        if (state.messages.size > prevMessageCount && state.messages.isNotEmpty()) {
+            listState.scrollToItem(state.messages.size - 1)
+        }
+        prevMessageCount = state.messages.size
+    }
+    LaunchedEffect(state.scrollToMessageId) {
+        val id = state.scrollToMessageId ?: return@LaunchedEffect
+        val idx = state.messages.indexOfFirst { it.id == id }
+        if (idx >= 0) {
+            listState.scrollToItem(idx)
+        }
+        viewModel.dispatch(ChatIntent.ClearScrollToMessage)
     }
     Column(modifier = modifier) {
         ErrorBanner(state.error) { viewModel.dispatch(ChatIntent.ClearError) }
