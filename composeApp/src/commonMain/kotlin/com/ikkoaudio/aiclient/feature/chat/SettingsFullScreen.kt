@@ -66,6 +66,29 @@ fun SettingsFullScreen(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
+                Text(
+                    text = "Connection",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedTextField(
+                    value = state.apiBaseUrl,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("API base URL (HTTP)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 1,
+                    maxLines = 4
+                )
+                OutlinedTextField(
+                    value = state.voiceChatWebSocketUrl,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Voice chat WebSocket URL") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 1,
+                    maxLines = 4
+                )
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(
                     text = "App version",

@@ -86,6 +86,8 @@ fun ChatScreen(viewModel: ChatViewModel) {
             (maxWidth * ChatLayoutTokens.NarrowDrawerWidthFraction)
                 .coerceAtMost(ChatLayoutTokens.NarrowDrawerMaxWidth)
         val peekStripWidth = ChatLayoutTokens.NarrowPeekStripWidth
+        val collapseLeftIfNarrow = { if (narrow) leftOpen = false }
+        val collapseRightIfNarrowAfterModeNav = { if (narrow) rightOpen = false }
         val leftColNarrow by animateDpAsState(
             targetValue = if (leftOpen) drawerWidth else peekStripWidth,
             animationSpec = tween(320),
@@ -119,7 +121,8 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                         leftOpen = true
                                     }
                                 },
-                                contentPaddingEnd = handleReserve
+                                contentPaddingEnd = handleReserve,
+                                onLeftContentInteraction = {}
                             )
                         }
                     }
@@ -151,7 +154,8 @@ fun ChatScreen(viewModel: ChatViewModel) {
                             selectedPage = state.selectedPage,
                             onSelectPage = { viewModel.dispatch(ChatIntent.SelectPage(it)) },
                             settingsScreenVisible = state.settingsScreenVisible,
-                            onOpenSettings = { viewModel.dispatch(ChatIntent.OpenSettingsScreen) }
+                            onOpenSettings = { viewModel.dispatch(ChatIntent.OpenSettingsScreen) },
+                            onAfterNonSettingsNav = {}
                         )
                     }
                 }
@@ -176,7 +180,8 @@ fun ChatScreen(viewModel: ChatViewModel) {
                                         leftOpen = true
                                     }
                                 },
-                                contentPaddingEnd = handleReserve
+                                contentPaddingEnd = handleReserve,
+                                onLeftContentInteraction = collapseLeftIfNarrow
                             )
                         }
                     }
@@ -208,7 +213,8 @@ fun ChatScreen(viewModel: ChatViewModel) {
                             selectedPage = state.selectedPage,
                             onSelectPage = { viewModel.dispatch(ChatIntent.SelectPage(it)) },
                             settingsScreenVisible = state.settingsScreenVisible,
-                            onOpenSettings = { viewModel.dispatch(ChatIntent.OpenSettingsScreen) }
+                            onOpenSettings = { viewModel.dispatch(ChatIntent.OpenSettingsScreen) },
+                            onAfterNonSettingsNav = collapseRightIfNarrowAfterModeNav
                         )
                     }
                 }
@@ -235,7 +241,9 @@ private fun LeftSidebarChrome(
     viewModel: ChatViewModel,
     expanded: Boolean,
     onToggle: () -> Unit,
-    contentPaddingEnd: Dp
+    contentPaddingEnd: Dp,
+    /** On narrow layout: collapse left drawer after user taps sidebar content (e.g. history). */
+    onLeftContentInteraction: () -> Unit
 ) {
     val reserve = ChatLayoutTokens.SidebarInnerHandleReserve
     Box(modifier = Modifier.fillMaxSize()) {
@@ -245,7 +253,11 @@ private fun LeftSidebarChrome(
                     .fillMaxSize()
                     .padding(end = contentPaddingEnd)
             ) {
-                LeftSidebarContent(state = state, viewModel = viewModel)
+                LeftSidebarContent(
+                    state = state,
+                    viewModel = viewModel,
+                    onLeftContentInteraction = onLeftContentInteraction
+                )
             }
         }
         Box(
@@ -271,7 +283,9 @@ private fun RightSidebarChrome(
     selectedPage: AppPage,
     onSelectPage: (AppPage) -> Unit,
     settingsScreenVisible: Boolean,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    /** On narrow layout: collapse right drawer after Voice/LLM/ASR/TTS (not Settings). */
+    onAfterNonSettingsNav: () -> Unit
 ) {
     val reserve = ChatLayoutTokens.SidebarInnerHandleReserve
     Box(modifier = Modifier.fillMaxSize()) {
@@ -283,7 +297,10 @@ private fun RightSidebarChrome(
             ) {
                 RightSidebarNav(
                     selectedPage = selectedPage,
-                    onSelectPage = onSelectPage,
+                    onSelectPage = { page ->
+                        onSelectPage(page)
+                        onAfterNonSettingsNav()
+                    },
                     settingsScreenVisible = settingsScreenVisible,
                     onOpenSettings = onOpenSettings
                 )
@@ -327,17 +344,27 @@ private fun InnerEdgeMenuIconButton(
 }
 
 @Composable
-private fun LeftSidebarContent(state: ChatState, viewModel: ChatViewModel) {
+private fun LeftSidebarContent(
+    state: ChatState,
+    viewModel: ChatViewModel,
+    onLeftContentInteraction: () -> Unit
+) {
     when (state.selectedPage) {
         AppPage.LLM -> ChatHistorySidebar(
             messages = state.messages,
             isVoicePage = false,
-            onSelectUserMessage = { viewModel.dispatch(ChatIntent.ScrollChatToMessage(it)) }
+            onSelectUserMessage = {
+                viewModel.dispatch(ChatIntent.ScrollChatToMessage(it))
+                onLeftContentInteraction()
+            }
         )
         AppPage.VOICECHAT -> ChatHistorySidebar(
             messages = state.messages,
             isVoicePage = true,
-            onSelectUserMessage = { viewModel.dispatch(ChatIntent.ScrollChatToMessage(it)) }
+            onSelectUserMessage = {
+                viewModel.dispatch(ChatIntent.ScrollChatToMessage(it))
+                onLeftContentInteraction()
+            }
         )
         AppPage.ASR -> AsrLeftPanel(state)
         AppPage.TTS -> TtsLeftPanel()

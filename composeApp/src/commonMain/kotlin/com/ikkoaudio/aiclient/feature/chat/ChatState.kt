@@ -29,8 +29,8 @@ data class ChatState(
      * [API_BASE_URL] so [ChatViewModel] state matches after the settings flow emits.
      */
     object Defaults {
-        const val API_BASE_URL = "http://192.168.100.115:8080"
-        const val VOICE_CHAT_WS_URL = "ws://192.168.100.137:8080/ws/chat"
+        const val API_BASE_URL = "http://192.168.100.137:8080"
+        const val VOICE_CHAT_WS_URL = "ws://192.168.100.115:8080/ws/chat"
     }
 }
 
