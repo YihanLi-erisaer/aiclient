@@ -15,6 +15,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.ButtonDefaults
@@ -33,6 +35,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.AnnotatedString
@@ -40,6 +48,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -518,11 +527,28 @@ private fun LlmInputSection(
             OutlinedTextField(
                 value = inputText,
                 onValueChange = onTextChange,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .onPreviewKeyEvent { event ->
+                        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        if (event.key != Key.Enter && event.key != Key.NumPadEnter) {
+                            return@onPreviewKeyEvent false
+                        }
+                        if (event.isShiftPressed) return@onPreviewKeyEvent false
+                        if (inputText.isBlank() || isLoading) return@onPreviewKeyEvent false
+                        onSend()
+                        true
+                    },
                 placeholder = { Text("Enter your question here", style =  MaterialTheme.typography.titleSmall,
                     color = ChatLayoutTokens.FrontColor) },
                 shape = RoundedCornerShape(ChatLayoutTokens.CornerRadius),
                 maxLines = 4,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(
+                    onSend = {
+                        if (inputText.isNotBlank() && !isLoading) onSend()
+                    }
+                ),
                 colors = TextFieldDefaults.colors(
                     unfocusedContainerColor = ChatLayoutTokens.SidebarBackground,
                     focusedContainerColor = ChatLayoutTokens.SidebarBackground,
@@ -542,7 +568,18 @@ private fun LlmInputSection(
                         ChatLayoutTokens.SidebarBackground,
                 )
             ) {
-                Text("Enter", style = MaterialTheme.typography.titleSmall, color = ChatLayoutTokens.FrontColor)
+                Column {
+                    Text(
+                        text = "Enter",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = ChatLayoutTokens.FrontColor
+                    )
+                    Text(
+                        text = "Press Enter",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = ChatLayoutTokens.FrontColor
+                    )
+                }
             }
         }
     }
