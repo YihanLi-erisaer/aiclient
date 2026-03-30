@@ -11,7 +11,7 @@ plugins {
 }
 
 /** In-app and Android `versionName`; reflected in generated [com.ikkoaudio.aiclient.AppVersion]. */
-val appVersionName = "2.3"
+val appVersionName = "3.0.0"
 
 val generateAppVersion by tasks.registering {
     val outDir = layout.buildDirectory.dir("generated/kotlin/appversion")
@@ -66,6 +66,7 @@ kotlin {
             implementation(libs.androidx.datastore.preferences)
             implementation(libs.ktor.client.okhttp)
             implementation(libs.slf4j.android)
+            implementation(libs.android.vad.webrtc)
         }
         commonMain {
             kotlin.srcDir(layout.buildDirectory.dir("generated/kotlin/appversion"))

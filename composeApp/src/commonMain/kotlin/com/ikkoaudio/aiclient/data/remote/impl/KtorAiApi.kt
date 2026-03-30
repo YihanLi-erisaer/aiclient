@@ -298,11 +298,21 @@ class KtorAiApi(
             var closeReason: String? = null
             withTimeout(120_000L) {
                 client.webSocket(urlString = url) {
-                    // Aligned with browser reference:
-                    //   ws.binaryType = "arraybuffer"  -> only affects onmessage shape (Blob vs ArrayBuffer), not send().
-                    //   onopen -> await file.arrayBuffer(); ws.send(arrayBuffer)  -> one binary frame, full payload.
-                    // Ktor: webSocket{} runs after HTTP 101 (= onopen). fileBytes == arrayBuffer bytes.
-                    send(Frame.Binary(true, fileBytes))
+                    // Outbound protocol: multiple Binary frames (4 KiB each) so small backend buffers can keep up;
+                    // then Text "END" marks end of file. Server should concatenate binaries until "END".
+                    val chunk = VOICE_CHAT_WS_CHUNK_BYTES
+                    var offset = 0
+                    var chunkIndex = 0
+                    while (offset < fileBytes.size) {
+                        val end = minOf(offset + chunk, fileBytes.size)
+                        send(Frame.Binary(true, fileBytes.copyOfRange(offset, end)))
+                        chunkIndex++
+                        offset = end
+                    }
+                    send(Frame.Text("END"))
+                    logger.i {
+                        "ASR_LLM_TTS WebSocket sent binaryChunks=$chunkIndex, totalBytes=${fileBytes.size}, then Text END"
+                    }
                     try {
                         while (true) {
                             when (val frame = incoming.receive()) {
@@ -492,5 +502,10 @@ class KtorAiApi(
                 resp.message ?: resp.content ?: resp.response ?: resp.text ?: body
             }
         }.getOrElse { body }
+    }
+
+    private companion object {
+        /** Voice-chat WebSocket: binary body is sent in chunks of this size, then a Text "END". */
+        private const val VOICE_CHAT_WS_CHUNK_BYTES = 4096
     }
 }

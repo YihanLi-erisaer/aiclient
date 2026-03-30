@@ -93,13 +93,14 @@ fun VoiceChatBody(state: ChatState, viewModel: ChatViewModel, modifier: Modifier
                 )
             ) {
                 Text(
-                    if (state.isRecording) "Stop" else "Hold to Chat",
+                    if (state.isRecording) "Stop listening" else "Start listening",
                     style = MaterialTheme.typography.titleSmall
                 )
             }
             Spacer(modifier = Modifier.height(20.dp))
             Text(
-                "Press and hold to speak. Your voice will be sent to the AI and the response played aloud.",
+                "Keeps the microphone open. When WebRTC VAD detects the end of a phrase, " +
+                    "that clip is sent to the server and the reply is played. Tap Stop when you are done.",
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(horizontal = 8.dp)
             )

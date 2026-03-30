@@ -5,6 +5,7 @@ import com.ikkoaudio.aiclient.core.audio.AudioPlayer
 import com.ikkoaudio.aiclient.core.audio.AudioRecorder
 import com.ikkoaudio.aiclient.core.audio.PlatformAudioPlayer
 import com.ikkoaudio.aiclient.core.audio.PlatformAudioRecorder
+import com.ikkoaudio.aiclient.core.audio.PlatformVoiceChatRecorder
 import com.ikkoaudio.aiclient.data.local.SettingsStore
 import com.ikkoaudio.aiclient.core.time.currentTimeMillis
 import co.touchlab.kermit.Logger
@@ -16,6 +17,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.random.Random
 
 class ChatViewModel(
@@ -24,12 +27,14 @@ class ChatViewModel(
     private val logger: Logger,
     private val scope: CoroutineScope,
     private val audioPlayer: AudioPlayer = PlatformAudioPlayer(),
-    private val audioRecorder: AudioRecorder = PlatformAudioRecorder()
+    private val audioRecorder: AudioRecorder = PlatformAudioRecorder(),
+    private val voiceChatRecorder: PlatformVoiceChatRecorder = PlatformVoiceChatRecorder()
 ) {
     private val _state = MutableStateFlow(ChatState())
     val state: StateFlow<ChatState> = _state.asStateFlow()
 
     private var streamJob: Job? = null
+    private val voiceChatSendMutex = Mutex()
 
     init {
         scope.launch {
@@ -223,32 +228,35 @@ class ChatViewModel(
     }
 
     private fun startVoiceChat() {
-        audioRecorder.startRecording()
-        _state.update { it.copy(isRecording = true, isVoiceChat = true) }
+        if (_state.value.isRecording && _state.value.isVoiceChat) return
+        voiceChatRecorder.start(scope) { wav -> sendVoiceChatUtterance(wav) }
+        _state.update { it.copy(isRecording = true, isVoiceChat = true, error = null) }
+    }
+
+    private suspend fun sendVoiceChatUtterance(bytes: ByteArray) {
+        voiceChatSendMutex.withLock {
+            if (bytes.isEmpty()) return@withLock
+            _state.update { it.copy(isLoading = true, error = null) }
+            val memoryId = ensureMemoryId()
+            val wsUrl = _state.value.voiceChatWebSocketUrl
+            val combinedResult = repository.asrLlmTtsChatWebSocket(wsUrl, bytes, "recording.wav", memoryId)
+            combinedResult.onSuccess { playback ->
+                _state.update { it.copy(isLoading = false) }
+                audioPlayer.play(playback.pcm, playback.format)
+            }
+            combinedResult.onFailure { err ->
+                logger.e { "Voice chat failed: ${err.message}" }
+                _state.update {
+                    it.copy(error = err.message ?: "Voice chat failed", isLoading = false)
+                }
+            }
+        }
     }
 
     private fun stopVoiceChat() {
         scope.launch {
-            val bytes = audioRecorder.stopRecording()
+            voiceChatRecorder.stop()
             _state.update { it.copy(isRecording = false) }
-            if (bytes.isEmpty()) {
-                _state.update { it.copy(error = "No audio recorded") }
-                return@launch
-            }
-            _state.update { it.copy(isLoading = true, error = null) }
-            val memoryId = ensureMemoryId()
-            val combinedResult =
-                repository.asrLlmTtsChatWebSocket(_state.value.voiceChatWebSocketUrl, bytes, "recording.wav", memoryId)
-            if (combinedResult.isSuccess) {
-                val playback = combinedResult.getOrThrow()
-                _state.update { it.copy(isLoading = false) }
-                audioPlayer.play(playback.pcm, playback.format)
-                return@launch
-            }
-
-            val err = combinedResult.exceptionOrNull()
-            logger.e { "Voice chat failed: ${err?.message}" }
-            _state.update { it.copy(error = err?.message ?: "Voice chat failed", isLoading = false) }
         }
     }
 
