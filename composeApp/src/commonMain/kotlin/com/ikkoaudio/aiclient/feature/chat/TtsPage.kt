@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun TtsLeftPanel(modifier: Modifier = Modifier) {
-    Column(modifier = modifier.fillMaxSize().padding(16.dp)) {
+    Column(modifier = modifier.fillMaxSize().padding(32.dp)) {
         Text(
             text = "TTS",
             style = MaterialTheme.typography.titleMedium,

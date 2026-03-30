@@ -25,7 +25,7 @@ import com.ikkoaudio.aiclient.core.permission.requestRecordPermissionIfNeeded
 /** Left column in wide layout: transcription output */
 @Composable
 fun AsrLeftPanel(state: ChatState, modifier: Modifier = Modifier) {
-    Column(modifier = modifier.fillMaxSize().padding(16.dp)) {
+    Column(modifier = modifier.fillMaxSize().padding(32.dp)) {
         Text(
             text = "Transcription",
             style = MaterialTheme.typography.titleMedium,
