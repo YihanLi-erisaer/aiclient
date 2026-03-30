@@ -61,6 +61,8 @@ class KtorAiApi(
                 }))
             }
             val body = response.bodyAsText()
+            //val rawData = Json.decodeFromString<TranscribeResponse>(body)
+            //val result = rawData.data
             logger.d { "ASR transcribe response: $body" }
             runCatching {
                 Json.decodeFromString<TranscribeResponse>(body).text ?: body

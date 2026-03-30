@@ -11,7 +11,7 @@ plugins {
 }
 
 /** In-app and Android `versionName`; reflected in generated [com.ikkoaudio.aiclient.AppVersion]. */
-val appVersionName = "3.0.0"
+val appVersionName = "3.0.1"
 
 val generateAppVersion by tasks.registering {
     val outDir = layout.buildDirectory.dir("generated/kotlin/appversion")

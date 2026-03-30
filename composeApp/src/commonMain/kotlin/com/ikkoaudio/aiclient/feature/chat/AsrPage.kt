@@ -66,7 +66,7 @@ fun AsrCenterPanel(state: ChatState, viewModel: ChatViewModel, modifier: Modifie
                         viewModel.dispatch(ChatIntent.StopRecording)
                     } else {
                         requestRecordPermissionIfNeeded { granted ->
-                            if (granted) viewModel.dispatch(ChatIntent.StartVoiceChat)
+                            if (granted) viewModel.dispatch(ChatIntent.StartRecording)
                             else viewModel.dispatch(ChatIntent.SetError("Microphone permission is required for recording"))
                         }
                     }
