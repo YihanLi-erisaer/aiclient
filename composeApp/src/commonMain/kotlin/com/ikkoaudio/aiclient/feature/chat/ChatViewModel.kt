@@ -54,6 +54,7 @@ class ChatViewModel(
         when (intent) {
             is ChatIntent.SendMessage -> sendMessage(intent.text)
             is ChatIntent.UpdateInput -> _state.update { it.copy(inputText = intent.text) }
+            is ChatIntent.UpdateOutput -> _state.update { it.copy(outputText = intent.text) }
             is ChatIntent.SendAudioFile -> sendAudioFile(intent.bytes, intent.fileName)
             is ChatIntent.SendImage -> sendImage(intent.bytes, intent.fileName, intent.message)
             ChatIntent.StartRecording -> startRecording()
@@ -301,7 +302,7 @@ class ChatViewModel(
                 .onSuccess { text ->
                     _state.update {
                         it.copy(
-                            inputText = it.inputText + text,
+                            outputText = it.outputText + text,
                             isLoading = false
                         )
                     }
@@ -320,7 +321,7 @@ class ChatViewModel(
             _state.update { it.copy(isLoading = true, error = null) }
             repository.textToSpeech(_state.value.apiBaseUrl, text)
                 .onSuccess { audioBytes ->
-                    _state.update { it.copy(isLoading = false) }
+                    _state.update { it.copy(isLoading = false, inputText = "") }
                     audioPlayer.play(audioBytes)
                 }
                 .onFailure { err ->

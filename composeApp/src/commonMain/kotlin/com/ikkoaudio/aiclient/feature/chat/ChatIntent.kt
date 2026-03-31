@@ -3,6 +3,7 @@ package com.ikkoaudio.aiclient.feature.chat
 sealed class ChatIntent {
     data class SendMessage(val text: String) : ChatIntent()
     data class UpdateInput(val text: String) : ChatIntent()
+    data class UpdateOutput(val text: String) : ChatIntent()
     data class SendAudioFile(val bytes: ByteArray, val fileName: String) : ChatIntent()
     data class SendImage(val bytes: ByteArray, val fileName: String, val message: String) : ChatIntent()
     object StartRecording : ChatIntent()

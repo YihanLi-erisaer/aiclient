@@ -33,7 +33,7 @@ fun AsrLeftPanel(state: ChatState, modifier: Modifier = Modifier) {
         )
         Spacer(modifier = Modifier.height(12.dp))
         OutlinedTextField(
-            value = state.inputText,
+            value = state.outputText,
             onValueChange = { },
             modifier = Modifier
                 .fillMaxWidth()
@@ -109,7 +109,7 @@ fun AsrPage(state: ChatState, viewModel: ChatViewModel) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             OutlinedTextField(
-                value = state.inputText,
+                value = state.outputText,
                 onValueChange = { },
                 modifier = Modifier
                     .fillMaxWidth()

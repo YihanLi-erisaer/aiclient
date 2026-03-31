@@ -10,6 +10,7 @@ enum class AppPage {
 data class ChatState(
     val messages: List<ChatMessageUi> = emptyList(),
     val inputText: String = "",
+    val outputText: String = "",
     val isLoading: Boolean = false,
     val isStreaming: Boolean = false,
     val error: String? = null,

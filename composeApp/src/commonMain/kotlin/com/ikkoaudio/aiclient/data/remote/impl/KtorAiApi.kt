@@ -2,6 +2,8 @@ package com.ikkoaudio.aiclient.data.remote.impl
 
 import com.ikkoaudio.aiclient.core.audio.PcmAudioFormat
 import com.ikkoaudio.aiclient.core.audio.PcmPlayback
+import com.ikkoaudio.aiclient.core.audio.WavPcmExtractor
+import com.ikkoaudio.aiclient.core.audio.pcmBytesPerFrame
 import com.ikkoaudio.aiclient.data.remote.api.AiApi
 import com.ikkoaudio.aiclient.data.remote.dto.ChatResponse
 import com.ikkoaudio.aiclient.data.remote.dto.ModelItem
@@ -97,8 +99,8 @@ class KtorAiApi(
         try {
             val base = normalizeUrl(baseUrl)
             val url = buildString {
-                append("$base/api/llm/chat_stream")
-                memoryId?.let { append("?memoryId=$it") }
+                append("$base/api/llm/chat")
+                memoryId?.let { append("?conversationId=$it") }
             }
             logger.i { "LLM chat_stream request -> $url, textLength=${message.length}" }
             client.preparePost(url) {
@@ -395,35 +397,148 @@ class KtorAiApi(
     }
 
     /**
-     * Raw body: optional first line `{"type":"audio_meta",...}` then newline, remainder is PCM_S16LE.
-     * If there is no prefix, assumes [PcmAudioFormat.VoiceChatPcm] (e.g. 22050 Hz mono).
+     * Optional leading JSON object `{"type":"audio_meta", "sampleRate":22050, ...}` then whitespace
+     * and raw PCM_S16LE bytes (single-line or pretty-printed meta; newline between meta and PCM is optional).
+     * If there is no prefix, assumes [PcmAudioFormat.VoiceChatPcm].
+     * Payload may be raw PCM or a WAV (RIFF) wrapper; WAV is detected and header stripped.
      */
     private fun parseBinaryPcmWithOptionalMetaPrefix(bytes: ByteArray): PcmPlayback {
-        if (bytes.isEmpty() || bytes[0] != '{'.code.toByte()) {
-            return PcmPlayback(bytes, PcmAudioFormat.VoiceChatPcm)
+        var i = skipUtf8Bom(bytes)
+        if (i >= bytes.size) {
+            return PcmPlayback(ByteArray(0), PcmAudioFormat.VoiceChatPcm)
         }
-        val nl = bytes.indexOf('\n'.code.toByte())
-        if (nl <= 0) {
-            return PcmPlayback(bytes, PcmAudioFormat.VoiceChatPcm)
+        if (bytes[i] != '{'.code.toByte()) {
+            val raw = bytes.copyOfRange(i, bytes.size)
+            WavPcmExtractor.tryExtract(raw)?.let { return it }
+            val pcm = trimPcmPayload(raw, PcmAudioFormat.VoiceChatPcm)
+            return PcmPlayback(pcm, PcmAudioFormat.VoiceChatPcm)
         }
-        val line = bytes.decodeToString(0, nl).trimEnd('\r')
-        if (!line.startsWith("{")) {
-            return PcmPlayback(bytes, PcmAudioFormat.VoiceChatPcm)
+        val jsonEnd = endIndexOfLeadingJsonObject(bytes, i)
+        if (jsonEnd == null) {
+            val raw = bytes.copyOfRange(i, bytes.size)
+            WavPcmExtractor.tryExtract(raw)?.let { return it }
+            val pcm = trimPcmPayload(raw, PcmAudioFormat.VoiceChatPcm)
+            return PcmPlayback(pcm, PcmAudioFormat.VoiceChatPcm)
         }
-        return runCatching {
-            val obj = Json.parseToJsonElement(line).jsonObject
-            if (obj["type"]?.jsonPrimitive?.content != "audio_meta") {
-                return PcmPlayback(bytes, PcmAudioFormat.VoiceChatPcm)
+        val jsonStr = bytes.decodeToString(i, jsonEnd)
+        val obj = runCatching { Json.parseToJsonElement(jsonStr).jsonObject }.getOrNull()
+            ?: return PcmPlayback(trimPcmPayload(bytes, PcmAudioFormat.VoiceChatPcm), PcmAudioFormat.VoiceChatPcm)
+        if (obj["type"]?.jsonPrimitive?.content != "audio_meta") {
+            return PcmPlayback(trimPcmPayload(bytes, PcmAudioFormat.VoiceChatPcm), PcmAudioFormat.VoiceChatPcm)
+        }
+        val format = pcmFormatFromAudioMeta(obj)
+        var pcmStart = jsonEnd
+        while (pcmStart < bytes.size) {
+            val b = bytes[pcmStart]
+            if (b == '\n'.code.toByte() || b == '\r'.code.toByte() ||
+                b == ' '.code.toByte() || b == '\t'.code.toByte()
+            ) {
+                pcmStart++
+            } else {
+                break
             }
-            val pcm = bytes.copyOfRange(nl + 1, bytes.size)
-            PcmPlayback(pcm, pcmFormatFromAudioMeta(obj))
-        }.getOrElse { PcmPlayback(bytes, PcmAudioFormat.VoiceChatPcm) }
+        }
+        var pcm = bytes.copyOfRange(pcmStart, bytes.size)
+        if (pcm.isEmpty()) {
+            val fromB64 = decodePcmBase64FromAudioMeta(obj)
+            if (fromB64 != null) {
+                logger.i { "ASR_LLM_TTS audio_meta inline base64 pcm bytes=${fromB64.size}" }
+                WavPcmExtractor.tryExtract(fromB64)?.let { extracted ->
+                    logger.i {
+                        "ASR_LLM_TTS base64 payload was WAV: ${extracted.format.sampleRate}Hz " +
+                            "${extracted.format.channels}ch ${extracted.format.format}"
+                    }
+                    return extracted
+                }
+                return PcmPlayback(trimPcmPayload(fromB64, format), format)
+            }
+        }
+        WavPcmExtractor.tryExtract(pcm)?.let { extracted ->
+            logger.i {
+                "ASR_LLM_TTS stream contained WAV: ${extracted.format.sampleRate}Hz " +
+                    "${extracted.format.channels}ch ${extracted.format.format}"
+            }
+            return extracted
+        }
+        pcm = trimPcmPayload(pcm, format)
+        logger.i {
+            "ASR_LLM_TTS audio_meta parsed sr=${format.sampleRate} ch=${format.channels} pcmBytes=${pcm.size}"
+        }
+        return PcmPlayback(pcm, format)
+    }
+
+    private fun skipUtf8Bom(bytes: ByteArray): Int {
+        if (bytes.size >= 3 &&
+            bytes[0] == 0xEF.toByte() && bytes[1] == 0xBB.toByte() && bytes[2] == 0xBF.toByte()
+        ) {
+            return 3
+        }
+        return 0
+    }
+
+    /**
+     * End index (exclusive) of the first complete JSON object starting at [start], honoring strings and escapes.
+     */
+    private fun endIndexOfLeadingJsonObject(bytes: ByteArray, start: Int): Int? {
+        if (start >= bytes.size || bytes[start] != '{'.code.toByte()) return null
+        var depth = 0
+        var inString = false
+        var escape = false
+        for (idx in start until bytes.size) {
+            val c = bytes[idx].toInt() and 0xFF
+            if (inString) {
+                if (escape) {
+                    escape = false
+                } else {
+                    when (c) {
+                        '\\'.code -> escape = true
+                        '"'.code -> inString = false
+                    }
+                }
+            } else {
+                when (c) {
+                    '"'.code -> inString = true
+                    '{'.code -> depth++
+                    '}'.code -> {
+                        depth--
+                        if (depth == 0) return idx + 1
+                    }
+                }
+            }
+        }
+        return null
+    }
+
+    private fun trimPcmPayload(pcm: ByteArray, format: PcmAudioFormat): ByteArray {
+        val bpf = format.pcmBytesPerFrame()
+        if (bpf <= 0 || pcm.isEmpty() || pcm.size % bpf == 0) return pcm
+        val n = (pcm.size / bpf) * bpf
+        return pcm.copyOf(n)
+    }
+
+    @OptIn(ExperimentalEncodingApi::class)
+    private fun decodePcmBase64FromAudioMeta(obj: JsonObject): ByteArray? {
+        val b64 = listOf("audio", "pcm", "pcmBase64", "audio_base64")
+            .mapNotNull { key ->
+                obj[key]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+            }
+            .firstOrNull()
+            ?: return null
+        return runCatching { Base64.decode(b64) }.getOrNull()
     }
 
     private fun pcmFormatFromAudioMeta(obj: JsonObject): PcmAudioFormat {
         val sr = jsonInt(obj, "sampleRate", 22050)
         val ch = jsonInt(obj, "channels", 1)
-        val fmt = obj["format"]?.jsonPrimitive?.content ?: "PCM_S16LE"
+        val mime = obj["mimeType"]?.jsonPrimitive?.content.orEmpty()
+        val explicit = obj["format"]?.jsonPrimitive?.content?.trim().orEmpty()
+        val fmt = when {
+            explicit.isNotEmpty() -> explicit
+            mime.contains("float", ignoreCase = true) ||
+                mime.contains("F32", ignoreCase = true) ||
+                mime.contains("pcm-f32", ignoreCase = true) -> "PCM_F32LE"
+            else -> "PCM_S16LE"
+        }
         return PcmAudioFormat(sampleRate = sr, channels = ch, format = fmt)
     }
 
