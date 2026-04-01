@@ -290,7 +290,7 @@ class KtorAiApi(
         fileBytes: ByteArray,
         fileName: String,
         memoryId: String?
-    ): Result<PcmPlayback> {
+    ): Result<ByteArray> {
         return runCatching {
             val url = wsUrl.trim()
             logger.i {
@@ -302,7 +302,7 @@ class KtorAiApi(
             var closeReason: String? = null
             withTimeout(120_000L) {
                 client.webSocket(urlString = url) {
-                    // Outbound protocol: multiple Binary frames (4 KiB each) so small backend buffers can keep up;
+                    // Outbound protocol: multiple Binary frames (8 KiB each) so small backend buffers can keep up;
                     // then Text "END" marks end of file. Server should concatenate binaries until "END".
                     val chunk = VOICE_CHAT_WS_CHUNK_BYTES
                     var offset = 0
@@ -352,7 +352,7 @@ class KtorAiApi(
                 throw IllegalStateException(
                     "WebSocket voice chat returned empty response ($detail). " +
                         "Handshake likely succeeded but the server sent no Text/Binary before closing — " +
-                        "check backend sends PCM (or audio_meta) before disconnecting; also verify server logs."
+                        "check backend sends audio (e.g. WAV) before disconnecting; also verify server logs."
                 )
             }
             logger.i {
@@ -360,7 +360,11 @@ class KtorAiApi(
             }
             val merged = mergeWsResponse(textChunks, binaryChunks)
             logger.i { "ASR_LLM_TTS WebSocket merged bytes=${merged.size}" }
-            parseBinaryPcmWithOptionalMetaPrefix(merged)
+            if (merged.isEmpty()) {
+                logger.e { "ASR_LLM_TTS WebSocket merged payload is empty (no audio bytes)." }
+                throw IllegalStateException("WebSocket voice chat returned empty audio.")
+            }
+            merged
         }.onFailure { logger.e { "ASR_LLM_TTS WebSocket failed: ${it.message}" } }
     }
 
@@ -623,6 +627,6 @@ class KtorAiApi(
 
     private companion object {
         /** Voice-chat WebSocket: binary body is sent in chunks of this size, then a Text "END". */
-        private const val VOICE_CHAT_WS_CHUNK_BYTES = 4096
+        private const val VOICE_CHAT_WS_CHUNK_BYTES = 8192
     }
 }

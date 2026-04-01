@@ -25,8 +25,8 @@ interface AiApi {
 
     suspend fun asrLlmTtsChat(baseUrl: String, fileBytes: ByteArray, fileName: String, memoryId: String?): Result<PcmPlayback>
 
-    /** Voice chat: send recorded audio over WebSocket; response is PCM (same parsing as HTTP). */
-    suspend fun asrLlmTtsChatWebSocket(wsUrl: String, fileBytes: ByteArray, fileName: String, memoryId: String?): Result<PcmPlayback>
+    /** Voice chat: send recorded audio over WebSocket; response is WAV (same as HTTP TTS) or raw audio bytes. */
+    suspend fun asrLlmTtsChatWebSocket(wsUrl: String, fileBytes: ByteArray, fileName: String, memoryId: String?): Result<ByteArray>
 
     /**
      * Opens a WebSocket, verifies HTTP 101 upgrade, then closes. Does not send app payload.

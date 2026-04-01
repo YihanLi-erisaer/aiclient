@@ -6,6 +6,7 @@ import com.ikkoaudio.aiclient.core.audio.AudioRecorder
 import com.ikkoaudio.aiclient.core.audio.PlatformAudioPlayer
 import com.ikkoaudio.aiclient.core.audio.PlatformAudioRecorder
 import com.ikkoaudio.aiclient.core.audio.PlatformVoiceChatRecorder
+import com.ikkoaudio.aiclient.core.audio.playPossiblyWavOrDefaultPcm
 import com.ikkoaudio.aiclient.data.local.SettingsStore
 import com.ikkoaudio.aiclient.core.time.currentTimeMillis
 import co.touchlab.kermit.Logger
@@ -241,9 +242,13 @@ class ChatViewModel(
             val memoryId = ensureMemoryId()
             val wsUrl = _state.value.voiceChatWebSocketUrl
             val combinedResult = repository.asrLlmTtsChatWebSocket(wsUrl, bytes, "recording.wav", memoryId)
-            combinedResult.onSuccess { playback ->
+            combinedResult.onSuccess { audioBytes ->
                 _state.update { it.copy(isLoading = false) }
-                audioPlayer.play(playback.pcm, playback.format)
+                if (audioBytes.isEmpty()) {
+                    _state.update { it.copy(error = "Voice chat returned empty audio") }
+                    return@onSuccess
+                }
+                audioPlayer.playPossiblyWavOrDefaultPcm(audioBytes)
             }
             combinedResult.onFailure { err ->
                 logger.e { "Voice chat failed: ${err.message}" }
@@ -322,7 +327,11 @@ class ChatViewModel(
             repository.textToSpeech(_state.value.apiBaseUrl, text)
                 .onSuccess { audioBytes ->
                     _state.update { it.copy(isLoading = false, inputText = "") }
-                    audioPlayer.play(audioBytes)
+                    if (audioBytes.isEmpty()) {
+                        _state.update { it.copy(error = "TTS returned empty audio") }
+                        return@onSuccess
+                    }
+                    audioPlayer.playPossiblyWavOrDefaultPcm(audioBytes)
                 }
                 .onFailure { err ->
                     logger.e { "TTS failed: ${err.message}" }

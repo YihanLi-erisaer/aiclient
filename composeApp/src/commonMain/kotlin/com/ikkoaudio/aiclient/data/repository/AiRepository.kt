@@ -36,7 +36,7 @@ class AiRepository(
     suspend fun asrLlmTtsChat(baseUrl: String, fileBytes: ByteArray, fileName: String, memoryId: String?): Result<PcmPlayback> =
         api.asrLlmTtsChat(baseUrl, fileBytes, fileName, memoryId)
 
-    suspend fun asrLlmTtsChatWebSocket(wsUrl: String, fileBytes: ByteArray, fileName: String, memoryId: String?): Result<PcmPlayback> =
+    suspend fun asrLlmTtsChatWebSocket(wsUrl: String, fileBytes: ByteArray, fileName: String, memoryId: String?): Result<ByteArray> =
         api.asrLlmTtsChatWebSocket(wsUrl, fileBytes, fileName, memoryId)
 
     suspend fun checkVoiceChatWebSocketHandshake(wsUrl: String): Result<String> =
