@@ -1,5 +1,8 @@
 package com.ikkoaudio.aiclient.data.repository
 
+import com.ikkoaudio.aiclient.asr.LocalAsrEngine
+import com.ikkoaudio.aiclient.asr.LocalAsrPreferences
+import com.ikkoaudio.aiclient.asr.LocalAsrProvider
 import com.ikkoaudio.aiclient.core.audio.PcmPlayback
 import com.ikkoaudio.aiclient.data.remote.api.AiApi
 import com.ikkoaudio.aiclient.domain.model.LlmModel
@@ -10,11 +13,30 @@ import kotlinx.coroutines.flow.first
 class AiRepository(
     private val api: AiApi,
     private val settingsStore: com.ikkoaudio.aiclient.data.local.SettingsStore,
-    private val logger: Logger
+    private val logger: Logger,
+    private val localAsr: LocalAsrEngine? = LocalAsrProvider.get(),
 ) {
 
-    suspend fun transcribeAudio(baseUrl: String, fileBytes: ByteArray, fileName: String): Result<String> =
-        api.transcribeAudio(baseUrl, fileBytes, fileName)
+    suspend fun transcribeAudio(baseUrl: String, fileBytes: ByteArray, fileName: String): Result<String> {
+        val local = localAsr
+        if (LocalAsrPreferences.requireLocalAsr) {
+            val engine = local ?: return Result.failure(
+                IllegalStateException("Local ASR is required but this platform has no ONNX engine (e.g. use Android).")
+            )
+            if (!engine.isReady) {
+                return Result.failure(
+                    IllegalStateException(
+                        "Local ASR is required but the ONNX model is not loaded. Add assets/models/asr.onnx."
+                    )
+                )
+            }
+            return engine.transcribeWav(fileBytes)
+        }
+        if (LocalAsrPreferences.preferLocalWhenReady && local != null && local.isReady) {
+            return local.transcribeWav(fileBytes)
+        }
+        return api.transcribeAudio(baseUrl, fileBytes, fileName)
+    }
 
     suspend fun chat(baseUrl: String, memoryId: String?, message: String): Result<String> =
         api.chat(baseUrl, memoryId, message)

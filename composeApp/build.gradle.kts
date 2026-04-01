@@ -67,6 +67,7 @@ kotlin {
             implementation(libs.ktor.client.okhttp)
             implementation(libs.slf4j.android)
             implementation(libs.android.vad.webrtc)
+            implementation(libs.onnxruntime.android)
         }
         commonMain {
             kotlin.srcDir(layout.buildDirectory.dir("generated/kotlin/appversion"))
