@@ -64,7 +64,7 @@ fun TtsCenterBody(state: ChatState, viewModel: ChatViewModel, modifier: Modifier
             Spacer(modifier = Modifier.height(16.dp))
             Button(
                 onClick = { viewModel.dispatch(ChatIntent.TextToSpeech) },
-                enabled = state.outputText.isNotBlank() && !state.isLoading,
+                enabled = state.inputText.isNotBlank() && !state.isLoading,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(ChatLayoutTokens.CornerRadius),
                 colors = ButtonDefaults.buttonColors(

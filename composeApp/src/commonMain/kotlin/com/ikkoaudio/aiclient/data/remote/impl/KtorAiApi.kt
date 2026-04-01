@@ -302,8 +302,8 @@ class KtorAiApi(
             var closeReason: String? = null
             withTimeout(120_000L) {
                 client.webSocket(urlString = url) {
-                    // Outbound protocol: multiple Binary frames (8 KiB each) so small backend buffers can keep up;
-                    // then Text "END" marks end of file. Server should concatenate binaries until "END".
+                    // Outbound: Binary chunks (8 KiB) + Text "END" after upload. Inbound: Binary = WAV (same as TTS),
+                    // then Text "[DONE]" when the WAV is fully sent and safe to play.
                     val chunk = VOICE_CHAT_WS_CHUNK_BYTES
                     var offset = 0
                     var chunkIndex = 0
@@ -321,7 +321,16 @@ class KtorAiApi(
                         while (true) {
                             when (val frame = incoming.receive()) {
                                 is Frame.Binary -> binaryChunks.add(frame.readBytes())
-                                is Frame.Text -> textChunks.add(frame.readText())
+                                is Frame.Text -> {
+                                    val t = frame.readText()
+                                    if (t.trim() == VOICE_CHAT_WS_DONE_MARKER) {
+                                        logger.d {
+                                            "ASR_LLM_TTS WebSocket received Text [DONE] — WAV transfer complete"
+                                        }
+                                        break
+                                    }
+                                    textChunks.add(t)
+                                }
                                 is Frame.Ping -> send(Frame.Pong(frame.readBytes()))
                                 is Frame.Close -> {
                                     val payload = frame.readBytes()
@@ -342,17 +351,16 @@ class KtorAiApi(
                     }
                 }
             }
-            if (textChunks.isEmpty() && binaryChunks.isEmpty()) {
+            if (binaryChunks.isEmpty()) {
                 val detail = buildString {
-                    append("no Text/Binary frames before close")
+                    append("no Binary (WAV) frames")
                     if (closeCode != null) append("; close code=").append(closeCode)
                     if (!closeReason.isNullOrBlank()) append(" reason=").append(closeReason)
                 }
-                logger.e { "ASR_LLM_TTS WebSocket empty response: $detail" }
+                logger.e { "ASR_LLM_TTS WebSocket no WAV data: $detail" }
                 throw IllegalStateException(
-                    "WebSocket voice chat returned empty response ($detail). " +
-                        "Handshake likely succeeded but the server sent no Text/Binary before closing — " +
-                        "check backend sends audio (e.g. WAV) before disconnecting; also verify server logs."
+                    "WebSocket voice chat returned no WAV data ($detail). " +
+                        "Expect Binary chunks (same WAV as TTS) then optional Text \"[DONE]\"."
                 )
             }
             logger.i {
@@ -385,7 +393,8 @@ class KtorAiApi(
     }
 
     private fun mergeWsResponse(textParts: List<String>, binaryParts: List<ByteArray>): ByteArray {
-        val text = textParts.joinToString("\n").trim()
+        val contentParts = textParts.map { it.trim() }.filter { it.isNotEmpty() && it != VOICE_CHAT_WS_DONE_MARKER }
+        val text = contentParts.joinToString("\n").trim()
         if (text.isEmpty()) {
             return binaryParts.fold(ByteArray(0)) { acc, b -> acc + b }
         }
@@ -628,5 +637,8 @@ class KtorAiApi(
     private companion object {
         /** Voice-chat WebSocket: binary body is sent in chunks of this size, then a Text "END". */
         private const val VOICE_CHAT_WS_CHUNK_BYTES = 8192
+
+        /** Server sends this Text after the last WAV Binary frame; not part of the file. */
+        private const val VOICE_CHAT_WS_DONE_MARKER = "[DONE]"
     }
 }

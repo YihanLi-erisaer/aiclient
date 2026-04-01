@@ -8,7 +8,7 @@ import io.ktor.client.plugins.websocket.WebSockets
  *
  * **Do not set [WebSockets.maxFrameSize] here:** the Android [OkHttp] engine throws
  * `"Max frame size switch is not supported in OkHttp engine."` — use default limits.
- * Voice chat sends audio as multiple [io.ktor.websocket.Frame.Binary] chunks (8 KiB) plus a Text "END".
+ * Voice chat: outbound Binary (8 KiB) + Text "END"; inbound Binary = WAV (same as TTS) + Text "[DONE]" when complete.
  */
 fun HttpClientConfig<*>.installAppWebSockets() {
     install(WebSockets)
