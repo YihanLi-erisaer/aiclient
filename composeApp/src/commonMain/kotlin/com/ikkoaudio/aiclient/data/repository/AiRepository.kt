@@ -21,12 +21,12 @@ class AiRepository(
         val local = localAsr
         if (LocalAsrPreferences.requireLocalAsr) {
             val engine = local ?: return Result.failure(
-                IllegalStateException("Local ASR is required but this platform has no ONNX engine (e.g. use Android).")
+                IllegalStateException("Local ASR is required but this platform has no sherpa-onnx engine (e.g. use Android).")
             )
             if (!engine.isReady) {
                 return Result.failure(
                     IllegalStateException(
-                        "Local ASR is required but the ONNX model is not loaded. Add assets/models/asr.onnx."
+                        "Local ASR is required but the sherpa-onnx Zipformer is not loaded. Add assets/models/sherpa-asr/ (encoder/decoder/joiner + tokens, or Zipformer CTC model.onnx + tokens)."
                     )
                 )
             }

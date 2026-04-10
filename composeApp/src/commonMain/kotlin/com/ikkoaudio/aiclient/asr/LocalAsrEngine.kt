@@ -1,7 +1,7 @@
 package com.ikkoaudio.aiclient.asr
 
 /**
- * Optional on-device ASR (e.g. ONNX Runtime on Android).
+ * Optional on-device ASR (sherpa-onnx on Android).
  * JS/Wasm targets do not ship an engine; [LocalAsrProvider.get] returns null there.
  */
 interface LocalAsrEngine {
@@ -21,13 +21,13 @@ interface LocalAsrEngine {
  */
 object LocalAsrPreferences {
     /**
-     * When true and [LocalAsrEngine.isReady], [AiRepository.transcribeAudio] uses the local ONNX engine.
+     * When true and [LocalAsrEngine.isReady], [AiRepository.transcribeAudio] uses the local sherpa-onnx engine.
      */
     var preferLocalWhenReady: Boolean = true
 
     /**
      * When true, ASR never calls the remote `/api/asr/transcribe` API.
-     * Fails if no local engine or the model is not loaded (e.g. missing `asr.onnx` in assets).
+     * Fails if no local engine or the sherpa-onnx model is not in assets (see Android `models/sherpa-asr/`).
      */
     var requireLocalAsr: Boolean = false
 }

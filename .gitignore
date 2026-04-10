@@ -17,3 +17,12 @@ captures
 !*.xcworkspace/contents.xcworkspacedata
 **/xcshareddata/WorkspaceSettings.xcsettings
 node_modules/
+composeApp/libs/sherpa-onnx*.aar
+sherpa-onnx-zipformer-zh-en-2023-11-22
+composeApp/release
+# 忽略 sherpa-asr 文件夹下的所有内容
+composeApp/src/androidMain/assets/models/sherpa-asr/*
+
+# 但不要忽略 .gitkeep 文件
+!sherpa-asr/.gitkeep
+model.tar.bz2

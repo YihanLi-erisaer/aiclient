@@ -19,7 +19,6 @@ ktor = "3.4.1"
 material3 = "1.10.0-alpha05"
 markdownRenderer = "0.39.2"
 android-webrtc-vad = "2.0.10"
-onnxruntime-android = "1.22.0"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -53,7 +52,6 @@ slf4j-android = { module = "org.slf4j:slf4j-android", version = "1.7.36" }
 compose-material-icons-extended = { module = "org.jetbrains.compose.material:material-icons-extended", version = "1.7.3" }
 markdown-renderer-m3 = { module = "com.mikepenz:multiplatform-markdown-renderer-m3", version.ref = "markdownRenderer" }
 android-vad-webrtc = { module = "com.github.gkonovalov.android-vad:webrtc", version.ref = "android-webrtc-vad" }
-onnxruntime-android = { module = "com.microsoft.onnxruntime:onnxruntime-android", version.ref = "onnxruntime-android" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

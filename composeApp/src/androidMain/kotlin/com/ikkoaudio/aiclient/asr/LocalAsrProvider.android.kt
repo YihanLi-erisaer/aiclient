@@ -9,7 +9,7 @@ actual object LocalAsrProvider {
     actual fun get(): LocalAsrEngine? {
         val ctx = getAppContext() as? Context ?: return null
         if (cached == null) {
-            cached = AndroidOnnxLocalAsrEngine(ctx.applicationContext)
+            cached = AndroidSherpaOnnxLocalAsrEngine(ctx.applicationContext)
         }
         return cached
     }

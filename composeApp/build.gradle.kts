@@ -1,4 +1,5 @@
-import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import java.net.URL
+import org.gradle.api.GradleException
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -41,6 +42,25 @@ afterEvaluate {
     }
 }
 
+/** Official sherpa-onnx Android AAR (Kotlin API + JNI). See https://github.com/k2-fsa/sherpa-onnx/releases */
+val sherpaOnnxVersion = "1.12.34"
+val sherpaOnnxAarFile = layout.projectDirectory.file("libs/sherpa-onnx-$sherpaOnnxVersion.aar").asFile
+if (!sherpaOnnxAarFile.exists()) {
+    sherpaOnnxAarFile.parentFile.mkdirs()
+    runCatching {
+        URL("https://github.com/k2-fsa/sherpa-onnx/releases/download/v$sherpaOnnxVersion/sherpa-onnx-$sherpaOnnxVersion.aar")
+            .openStream().use { input ->
+                sherpaOnnxAarFile.outputStream().use { input.copyTo(it) }
+            }
+    }.getOrElse {
+        throw GradleException(
+            "Could not download sherpa-onnx AAR (${it.message}). " +
+                "Download sherpa-onnx-$sherpaOnnxVersion.aar from " +
+                "https://github.com/k2-fsa/sherpa-onnx/releases and place it at: ${sherpaOnnxAarFile.absolutePath}"
+        )
+    }
+}
+
 kotlin {
     androidTarget {
         compilerOptions {
@@ -67,7 +87,7 @@ kotlin {
             implementation(libs.ktor.client.okhttp)
             implementation(libs.slf4j.android)
             implementation(libs.android.vad.webrtc)
-            implementation(libs.onnxruntime.android)
+            implementation(files(sherpaOnnxAarFile))
         }
         commonMain {
             kotlin.srcDir(layout.buildDirectory.dir("generated/kotlin/appversion"))
@@ -112,6 +132,10 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
         versionName = appVersionName
+
+        ndk {
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a")
+        }
     }
     packaging {
         resources {
@@ -120,7 +144,13 @@ android {
     }
     buildTypes {
         getByName("release") {
-            isMinifyEnabled = false
+            isMinifyEnabled = true          // 开启混淆（R8）
+            isShrinkResources = true        // 移除无用资源
+
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
     compileOptions {

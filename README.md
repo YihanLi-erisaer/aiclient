@@ -141,6 +141,7 @@ in your IDE’s toolbar or build it directly from the terminal:
   ```shell
   .\gradlew.bat :composeApp:assembleDebug
   ```
+if you want to deploy asr model in frontend side, download the model from (https://k2-fsa.github.io/sherpa/onnx/pretrained_models/offline-transducer/zipformer-transducer-models.html)
 
 ### Build and Run Web Application
 
