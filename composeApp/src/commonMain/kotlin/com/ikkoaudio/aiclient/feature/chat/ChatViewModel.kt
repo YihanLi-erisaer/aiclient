@@ -38,8 +38,8 @@ class ChatViewModel(
     private val voiceChatSendMutex = Mutex()
 
     init {
+        _state.update { it.copy(localAsrAvailable = repository.isLocalAsrAvailable) }
         scope.launch {
-            // Keeps [ChatState.apiBaseUrl] in sync with settings; use [ChatState.Defaults.API_BASE_URL] as single source.
             settingsStore.getApiBaseUrl().collect { url ->
                 _state.update { it.copy(apiBaseUrl = url) }
             }
@@ -63,6 +63,7 @@ class ChatViewModel(
             ChatIntent.StartVoiceChat -> startVoiceChat()
             ChatIntent.StopVoiceChat -> stopVoiceChat()
             ChatIntent.CheckVoiceChatWebSocketHandshake -> checkVoiceChatWebSocketHandshake()
+            ChatIntent.ToggleLocalAsr -> _state.update { it.copy(useLocalAsr = !it.useLocalAsr) }
             ChatIntent.TextToSpeech -> textToSpeech()
             ChatIntent.ClearError -> _state.update { it.copy(error = null) }
             is ChatIntent.SetError -> _state.update { it.copy(error = intent.message) }
@@ -231,7 +232,11 @@ class ChatViewModel(
 
     private fun startVoiceChat() {
         if (_state.value.isRecording && _state.value.isVoiceChat) return
-        voiceChatRecorder.start(scope) { wav -> sendVoiceChatUtterance(wav) }
+        val useLocalAsr = _state.value.useLocalAsr
+        voiceChatRecorder.start(scope) { wav ->
+            if (useLocalAsr) sendVoiceChatWithLocalAsr(wav)
+            else sendVoiceChatUtterance(wav)
+        }
         _state.update { it.copy(isRecording = true, isVoiceChat = true, error = null) }
     }
 
@@ -255,6 +260,53 @@ class ChatViewModel(
                 _state.update {
                     it.copy(error = err.message ?: "Voice chat failed", isLoading = false)
                 }
+            }
+        }
+    }
+
+    /**
+     * Local ASR voice chat: transcribe WAV on-device, send text to LLM, then TTS the response.
+     */
+    private suspend fun sendVoiceChatWithLocalAsr(wavBytes: ByteArray) {
+        voiceChatSendMutex.withLock {
+            if (wavBytes.isEmpty()) return@withLock
+            _state.update { it.copy(isLoading = true, error = null) }
+
+            val transcribeResult = repository.transcribeLocal(wavBytes)
+            val text = transcribeResult.getOrElse { err ->
+                logger.e { "Local ASR failed: ${err.message}" }
+                _state.update { it.copy(error = "Local ASR failed: ${err.message}", isLoading = false) }
+                return@withLock
+            }
+            if (text.isBlank()) {
+                logger.i { "Local ASR returned blank text, skipping" }
+                _state.update { it.copy(isLoading = false) }
+                return@withLock
+            }
+            logger.i { "Local ASR transcribed: $text" }
+
+            val baseUrl = _state.value.apiBaseUrl
+            val memoryId = ensureMemoryId()
+            val chatResult = repository.chat(baseUrl, memoryId, text)
+            val response = chatResult.getOrElse { err ->
+                logger.e { "LLM chat failed after local ASR: ${err.message}" }
+                _state.update { it.copy(error = "LLM chat failed: ${err.message}", isLoading = false) }
+                return@withLock
+            }
+            logger.i { "LLM response length=${response.length}" }
+
+            val ttsResult = repository.textToSpeech(baseUrl, response)
+            ttsResult.onSuccess { audioBytes ->
+                _state.update { it.copy(isLoading = false) }
+                if (audioBytes.isEmpty()) {
+                    _state.update { it.copy(error = "TTS returned empty audio") }
+                    return@onSuccess
+                }
+                audioPlayer.playPossiblyWavOrDefaultPcm(audioBytes)
+            }
+            ttsResult.onFailure { err ->
+                logger.e { "TTS failed after local ASR: ${err.message}" }
+                _state.update { it.copy(error = "TTS failed: ${err.message}", isLoading = false) }
             }
         }
     }

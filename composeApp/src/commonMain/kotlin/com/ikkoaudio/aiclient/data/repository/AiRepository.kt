@@ -17,6 +17,18 @@ class AiRepository(
     private val localAsr: LocalAsrEngine? = LocalAsrProvider.get(),
 ) {
 
+    val isLocalAsrAvailable: Boolean get() = localAsr?.isReady == true
+
+    suspend fun transcribeLocal(wavBytes: ByteArray): Result<String> {
+        val engine = localAsr ?: return Result.failure(
+            IllegalStateException("Local ASR not available on this platform")
+        )
+        if (!engine.isReady) return Result.failure(
+            IllegalStateException("Local ASR model not loaded")
+        )
+        return engine.transcribeWav(wavBytes)
+    }
+
     suspend fun transcribeAudio(baseUrl: String, fileBytes: ByteArray, fileName: String): Result<String> {
         val local = localAsr
         if (LocalAsrPreferences.requireLocalAsr) {

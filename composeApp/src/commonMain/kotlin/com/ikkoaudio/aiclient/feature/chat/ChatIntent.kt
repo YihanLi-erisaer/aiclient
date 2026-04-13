@@ -12,6 +12,7 @@ sealed class ChatIntent {
     object StopVoiceChat : ChatIntent()
     /** Probe [ChatState.voiceChatWebSocketUrl] for HTTP 101 WebSocket handshake. */
     object CheckVoiceChatWebSocketHandshake : ChatIntent()
+    object ToggleLocalAsr : ChatIntent()
     object TextToSpeech : ChatIntent()
     object ClearError : ChatIntent()
     data class SetError(val message: String) : ChatIntent()

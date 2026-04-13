@@ -20,6 +20,8 @@ data class ChatState(
     val voiceChatWebSocketHandshake: VoiceChatWebSocketHandshakeState = VoiceChatWebSocketHandshakeState.Unknown,
     val isRecording: Boolean = false,
     val isVoiceChat: Boolean = false,  // true = full ASR->LLM->TTS pipeline
+    val useLocalAsr: Boolean = false,
+    val localAsrAvailable: Boolean = false,
     val selectedPage: AppPage = AppPage.VOICECHAT,
     val settingsScreenVisible: Boolean = false,
     /** When set, [LlmChatBody] scrolls to this message then clears (sidebar history tap). */

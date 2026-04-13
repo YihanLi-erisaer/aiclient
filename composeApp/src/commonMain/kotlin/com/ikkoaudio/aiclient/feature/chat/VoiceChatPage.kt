@@ -1,6 +1,8 @@
 package com.ikkoaudio.aiclient.feature.chat
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,6 +15,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -64,6 +67,31 @@ fun VoiceChatBody(state: ChatState, viewModel: ChatViewModel, modifier: Modifier
                 else -> { }
             }
             Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Local ASR",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Switch(
+                    checked = state.useLocalAsr,
+                    onCheckedChange = { viewModel.dispatch(ChatIntent.ToggleLocalAsr) },
+                    enabled = !state.isRecording,
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                )
+                Text(
+                    if (state.localAsrAvailable) "Ready" else "Unavailable",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (state.localAsrAvailable)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.outline
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
             if (state.isLoading) {
                 CircularProgressIndicator()
                 Spacer(modifier = Modifier.height(16.dp))
@@ -99,8 +127,14 @@ fun VoiceChatBody(state: ChatState, viewModel: ChatViewModel, modifier: Modifier
             }
             Spacer(modifier = Modifier.height(20.dp))
             Text(
-                "Keeps the microphone open. When WebRTC VAD detects the end of a phrase, " +
-                    "that clip is sent to the server and the reply is played. Tap Stop when you are done.",
+                if (state.useLocalAsr)
+                    "Keeps the microphone open. When VAD detects the end of a phrase, " +
+                        "it is transcribed locally (sherpa-onnx), the text is sent to the LLM, " +
+                        "and the reply is spoken via TTS. Tap Stop when you are done."
+                else
+                    "Keeps the microphone open. When VAD detects the end of a phrase, " +
+                        "that audio clip is sent to the server for ASR→LLM→TTS and the reply is played. " +
+                        "Tap Stop when you are done.",
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(horizontal = 8.dp)
             )
