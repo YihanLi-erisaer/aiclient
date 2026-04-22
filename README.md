@@ -1,186 +1,176 @@
-# AI Client: A Unified Interface for Multi-LLM Applications
+# AI Client (aiclient)
+
+Unified **Kotlin / Compose Multiplatform** client for **ASR**, **LLM chat**, **TTS**, and **end-to-end voice chat** (ASR → LLM → TTS) against a compatible backend.
+
+---
 
 ## Overview
 
-AI Client is a full-stack application designed to provide a unified and extensible interface for interacting with multiple Large Language Models (LLMs). The project focuses on simplifying integration, improving usability, and enabling rapid prototyping of AI-powered applications.
+This app provides a single UI to:
 
-Modern AI development faces a critical challenge: fragmented APIs across different model providers. This project addresses the problem by building a client-side system that abstracts model interactions and enables seamless switching between different LLM backends.
+- Talk to an LLM with streaming replies (chat page).
+- Run **text-to-speech** and **speech-to-text** (ASR).
+- Use **continuous voice chat**: microphone stays open, utterances are segmented with **VAD**, then sent to the server (audio or on-device text) and the spoken reply is played back.
 
----
-
-## Motivation
-
-With the rapid evolution of LLM ecosystems (e.g., OpenAI, Claude, Gemini), developers often face:
-
-- Inconsistent API formats and request structures
-- High integration costs when switching models
-- Limited flexibility in experimenting with multiple models
-
-This project aims to:
-
-- Provide a unified interaction layer for LLMs
-- Reduce engineering overhead in AI application development
-- Enable scalable and modular AI system design
-
----
-
-## System Architecture
-
-Frontend (Kotlin / Compose Multiplatform)
-
-↓
-
-State Management (MVI / ViewModel)
-
-↓
-
-API Layer (REST / HTTP Client)
-
-↓
-
-Backend / Proxy Layer (LLM Adapter / OpenAI-compatible API)
-
-↓
-
-Multiple LLM Providers (OpenAI / Claude / Gemini / etc.)
+The client targets **Android** (full feature set, including on-device ASR) and **Web** (JS / Wasm; voice chat VAD on JS; Wasm mic path is limited).
 
 ---
 
 ## Key Features
 
-### 1. Unified LLM Interaction Interface
-- Abstracts differences between model providers
-- Enables seamless switching between LLMs
-- Supports OpenAI-compatible API formats
+| Area | What it does |
+|------|----------------|
+| **LLM** | Streamed chat, optional memory / conversation id, image upload where supported. |
+| **TTS** | Sends text to backend TTS; plays returned audio. |
+| **ASR** | Continuous listen: **WebRTC VAD** (Android) segments phrases → transcribe (local sherpa-onnx when available, else HTTP) → append to transcript. |
+| **Voice chat** | Continuous recording + VAD; each utterance triggers **WebSocket** `/ws/chat`-style pipeline: server ASR+LLM+TTS **or** **local ASR** then **text over the same WebSocket** with an `END` marker; reply audio is WAV (or compatible) over the socket. |
+| **Local ASR (Android)** | [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) under `assets/models/sherpa-asr/`. **Offline** models work for phrase-at-a-time recognition; **streaming / online** models expose live partial text when metadata supports it. |
+| **Server “thinking” hint** | Plain text, JSON (`message` / `text` / `content`, etc.), or small **Binary UTF-8** status frames can show an interim line (e.g. “努力思考中，请等一等……”) until final TTS audio arrives. |
+| **Settings** | API base URL, WebSocket URL, memory id, and related defaults (see in-app settings). |
 
-### 2. Real-time AI Chat Experience
-- Interactive chat interface with modern UI
-- Efficient state updates using reactive architecture
-- Designed for low latency and smooth UX
+Default endpoints in code (override in app settings): HTTP `ChatState.Defaults.API_BASE_URL`, WebSocket `ChatState.Defaults.VOICE_CHAT_WS_URL`.
 
-### 3. Modular System Design
-- Clear separation between UI, state, and data layers
-- Easily extendable for new models or features
-- Suitable for scaling into production-level systems
+---
 
-### 4. Cross-platform Capability
-- Built with Kotlin and Compose Multiplatform
-- Potential deployment on Android / Desktop
+## Architecture (high level)
+
+```
+Compose UI  →  ChatViewModel  →  AiRepository  →  Ktor (HTTP + WebSocket)
+                              ↘  LocalAsrEngine (Android / sherpa-onnx)
+```
+
+- **HTTP**: transcribe, chat, chat stream, TTS, combined ASR+LLM+TTS, etc.
+- **WebSocket voice chat**: client sends **binary chunks + Text `END`** for audio, or **Text user message + Text `END`** when using local ASR; server may send **binary audio**, **Text** status / `[DONE]`, and optional JSON `audio_meta` prefixes (see implementation in `KtorAiApi`).
 
 ---
 
 ## Tech Stack
 
-### Frontend
-- Kotlin
-- Jetpack Compose / Compose Multiplatform
-
-### Backend & Integration
-- RESTful APIs
-- OpenAI-compatible API interface
-- LLM integration layer
-
-### Architecture & Design
-- MVI Architecture
-- Reactive state management
-- Client-server architecture
-
-### Tools
-- Git / GitHub
-- Gradle
+- Kotlin, **Compose Multiplatform**, **Ktor** client (HTTP, WebSocket)
+- Android: **AudioRecord**, **WebRTC VAD** (android-vad), **sherpa-onnx** JNI where bundled
+- Coroutines, StateFlow, DataStore (settings)
 
 ---
 
-## Technical Highlights
+## How to use
 
-- Designed a modular LLM client system with clear separation of concerns
-- Implemented reactive UI updates using modern Android architecture
-- Built a scalable interface for integrating multiple AI models
-- Optimized interaction flow between frontend and AI backend
+### 1. Run the backend
+
+Point the app at your ASR / LLM / TTS / WebSocket server. Implement (or proxy) routes consistent with `AiApi` / `KtorAiApi` (e.g. `/api/asr/transcribe`, `/api/llm/chat`, `/api/tts/speak`, WebSocket voice chat).
+
+### 2. Configure the app
+
+Open **Settings** in the app and set:
+
+- **API base URL** (HTTP), e.g. `http://YOUR_HOST:8080`
+- **Voice chat WebSocket URL**, e.g. `ws://YOUR_HOST:8080/ws/chat`
+- **Memory / conversation id** if your backend expects it (query or body per your API).
+
+You can also probe **WebSocket handshake** from the Voice chat screen.
+
+### 3. Voice chat tab
+
+1. Grant **microphone** permission.
+2. Optional: enable **Local ASR** if models are installed (Android).  
+   - **Offline** model: each VAD segment is transcribed on-device, then **text** is sent on the WebSocket (with `END`), same socket as audio mode.  
+   - **Streaming** model (if supported): partial text may appear while speaking.
+3. Tap **Start listening**. Speak in phrases; short pauses trigger end-of-utterance (VAD tunable in `VoiceChatRecorder.android.kt`).
+4. Wait for server processing: an interim status line may appear; **TTS audio** plays when the full reply arrives. Recording can **pause during playback** to reduce echo (see `ChatViewModel` / recorder pause-resume).
+5. Tap **Stop** when finished.
+
+### 4. ASR tab
+
+1. Tap **Record** to start **continuous** VAD-based listening (same segmentation idea as voice chat, without LLM/TTS).
+2. Transcripts **append** to the text area (newline between utterances).
+3. Tap **Stop** to end.
+
+### 5. LLM / TTS tabs
+
+- **LLM**: type a message, send, read streamed assistant reply.
+- **TTS**: enter text, play synthesized speech from the server.
+
+### 6. Local ASR models (Android only)
+
+1. Download a compatible **sherpa-onnx** model (e.g. [offline Zipformer transducer](https://k2-fsa.github.io/sherpa/onnx/pretrained_models/offline-transducer/zipformer-transducer-models.html) or an **online / streaming** variant if you want streaming ASR).
+2. Place files under **`composeApp/src/androidMain/assets/models/sherpa-asr/`** (or the path in `AndroidSherpaOnnxLocalAsrEngine.DEFAULT_MODEL_DIR`):  
+   - **Transducer**: `encoder*.onnx`, `decoder*.onnx`, `joiner*.onnx`, `tokens.txt`  
+   - **Zipformer CTC**: `model.onnx` or `model.int8.onnx`, `tokens.txt`
+3. Rebuild the app. The UI shows whether local ASR is **Unavailable / Offline / Streaming**.
+
+**Note:** Initializing an **online** recognizer with an **offline-only** encoder can crash native code; the app skips online init when encoder metadata is incompatible (see `AndroidSherpaOnnxLocalAsrEngine`).
+
+---
+
+## Build & run
+
+### Android
+
+```shell
+# macOS / Linux
+./gradlew :composeApp:assembleDebug
+
+# Windows
+.\gradlew.bat :composeApp:assembleDebug
+```
+
+Install the debug APK from `composeApp/build/outputs/apk/debug/` or run from Android Studio.
+
+### Web (Wasm — preferred for modern browsers)
+
+```shell
+# macOS / Linux
+./gradlew :composeApp:wasmJsBrowserDevelopmentRun
+
+# Windows
+.\gradlew.bat :composeApp:wasmJsBrowserDevelopmentRun
+```
+
+### Web (JS)
+
+```shell
+# macOS / Linux
+./gradlew :composeApp:jsBrowserDevelopmentRun
+
+# Windows
+.\gradlew.bat :composeApp:jsBrowserDevelopmentRun
+```
 
 ---
 
-## Future Work
+## Repository layout
 
-- Add Retrieval-Augmented Generation (RAG) support
-- Introduce local model deployment (on-device inference)
-- Implement caching and streaming optimization
-- Enhance system scalability and performance monitoring
+- [`composeApp/src/commonMain`](./composeApp/src/commonMain/kotlin) — shared UI, ViewModel, API interfaces, Ktor implementation
+- [`composeApp/src/androidMain`](./composeApp/src/androidMain/kotlin) — Android audio, permissions, sherpa-onnx engine
+- [`composeApp/src/jsMain`](./composeApp/src/jsMain/kotlin) / [`wasmJsMain`](./composeApp/src/wasmJsMain/kotlin) — web audio / stubs
+
+---
+
+## Roadmap ideas
+
+- RAG and document-grounded chat  
+- Richer on-device models on more targets  
+- Connection quality and retry UX for WebSocket voice chat  
 
 ---
 
-## Project Value
+## Design reference
 
-This project demonstrates the ability to:
-
-- Design and implement full-stack AI applications
-- Work with modern LLM ecosystems and APIs
-- Build scalable and maintainable software systems
-- Bridge frontend engineering with AI system integration
-
-
-
-* [/composeApp](./composeApp/src) is for code that will be shared across your Compose Multiplatform applications.
-  It contains several subfolders:
-  - [commonMain](./composeApp/src/commonMain/kotlin) is for code that’s common for all targets.
-  - Other folders are for Kotlin code that will be compiled for only the platform indicated in the folder name.
-    For example, if you want to use Apple’s CoreCrypto for the iOS part of your Kotlin app,
-    the [iosMain](./composeApp/src/iosMain/kotlin) folder would be the right place for such calls.
-    Similarly, if you want to edit the Desktop (JVM) specific part, the [jvmMain](./composeApp/src/jvmMain/kotlin)
-    folder is the appropriate location.
-
-### Build and Run Android Application
-
-To build and run the development version of the Android app, use the run configuration from the run widget
-in your IDE’s toolbar or build it directly from the terminal:
-- on macOS/Linux
-  ```shell
-  ./gradlew :composeApp:assembleDebug
-  ```
-- on Windows
-  ```shell
-  .\gradlew.bat :composeApp:assembleDebug
-  ```
-if you want to deploy asr model in frontend side, download the model from (https://k2-fsa.github.io/sherpa/onnx/pretrained_models/offline-transducer/zipformer-transducer-models.html)
-
-### Build and Run Web Application
-
-To build and run the development version of the web app, use the run configuration from the run widget
-in your IDE's toolbar or run it directly from the terminal:
-- for the Wasm target (faster, modern browsers):
-  - on macOS/Linux
-    ```shell
-    ./gradlew :composeApp:wasmJsBrowserDevelopmentRun
-    ```
-  - on Windows
-    ```shell
-    .\gradlew.bat :composeApp:wasmJsBrowserDevelopmentRun
-    ```
-- for the JS target (slower, supports older browsers):
-  - on macOS/Linux
-    ```shell
-    ./gradlew :composeApp:jsBrowserDevelopmentRun
-    ```
-  - on Windows
-    ```shell
-    .\gradlew.bat :composeApp:jsBrowserDevelopmentRun
-    ```
+**Original UI (Penpot):** [Penpot design](https://design.penpot.app/#/view?file-id=1c48efe5-2f9f-81cd-8007-c2e878421e35&page-id=1c48efe5-2f9f-81cd-8007-c2e878421e36&section=interactions&index=0&share-id=9afc49c1-9c44-8036-8007-c2f0f444ab94)
 
 ---
-**Original UI design link from penpot:** [Original UI design](https://design.penpot.app/#/view?file-id=1c48efe5-2f9f-81cd-8007-c2e878421e35&page-id=1c48efe5-2f9f-81cd-8007-c2e878421e36&section=interactions&index=0&share-id=9afc49c1-9c44-8036-8007-c2f0f444ab94)
 
-Learn more about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html),
+## Learn more
 
-[Compose Multiplatform](https://github.com/JetBrains/compose-multiplatform/#compose-multiplatform),
+- [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html)  
+- [Compose Multiplatform](https://github.com/JetBrains/compose-multiplatform)  
+- [Kotlin/Wasm](https://kotl.in/wasm/)  
 
-[Kotlin/Wasm](https://kotl.in/wasm/)…
+Feedback: [#compose-web Slack](https://slack-chats.kotlinlang.org/c/compose-web) · Issues: [JetBrains YouTrack (CMP)](https://youtrack.jetbrains.com/newIssue?project=CMP)
 
-We would appreciate your feedback on Compose/Web and Kotlin/Wasm in the public Slack channel [#compose-web](https://slack-chats.kotlinlang.org/c/compose-web).
-If you face any issues, please report them on [YouTrack](https://youtrack.jetbrains.com/newIssue?project=CMP).
 ---
 
 ## Author
 
-Yihan Li  
+**Yihan Li**  
 Email: liyihan11unique@outlook.com  
 GitHub: https://github.com/YihanLi-erisaer
