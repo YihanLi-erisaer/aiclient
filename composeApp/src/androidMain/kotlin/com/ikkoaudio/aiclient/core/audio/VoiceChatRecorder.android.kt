@@ -65,7 +65,7 @@ actual class PlatformVoiceChatRecorder {
             FrameSize.FRAME_SIZE_320,
             Mode.NORMAL,
             200,
-            80
+            300
         )
 
         val minBuffer = AudioRecord.getMinBufferSize(pcmSampleRate, channelConfig, audioFormat)

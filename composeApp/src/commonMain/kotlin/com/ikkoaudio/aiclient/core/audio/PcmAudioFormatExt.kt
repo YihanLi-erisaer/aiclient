@@ -14,4 +14,5 @@ fun PcmAudioFormat.pcmBytesPerFrame(): Int {
 }
 
 fun PcmAudioFormat.isPcmFloatLe(): Boolean =
-    format.contains("F32", ignoreCase = true) || format.contains("FLOAT", ignoreCase = true)
+    format.contains("F32", ignoreCase = true) || format.contains("FLOAT",
+        ignoreCase = true)
