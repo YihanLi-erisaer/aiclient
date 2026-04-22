@@ -9,10 +9,19 @@ import kotlinx.coroutines.launch
 actual class PlatformVoiceChatRecorder {
 
     private var running = false
+    private var paused = false
     private var audioContext: dynamic = null
     private var mediaStream: dynamic = null
     private var processor: dynamic = null
     private var sourceNode: dynamic = null
+
+    actual fun startWithFrameCallback(
+        scope: CoroutineScope,
+        onUtteranceWav: suspend (ByteArray) -> Unit,
+        onAudioFrame: (FloatArray) -> Unit,
+    ) {
+        start(scope, onUtteranceWav)
+    }
 
     actual fun start(scope: CoroutineScope, onUtteranceWav: suspend (ByteArray) -> Unit) {
         if (running) return
@@ -62,7 +71,7 @@ actual class PlatformVoiceChatRecorder {
                 val proc = ctx.createScriptProcessor(4096, 1, 1)
                 processor = proc
                 proc.onaudioprocess = { ev: dynamic ->
-                    if (running) {
+                    if (running && !paused) {
                         val input = ev.inputBuffer.getChannelData(0)
                         val pcmChunk = floatsToPcm16LeMono(input)
                         carry = carry + pcmChunk
@@ -93,6 +102,14 @@ actual class PlatformVoiceChatRecorder {
                 null
             }
         )
+    }
+
+    actual fun pause() {
+        paused = true
+    }
+
+    actual fun resume() {
+        paused = false
     }
 
     actual suspend fun stop() {

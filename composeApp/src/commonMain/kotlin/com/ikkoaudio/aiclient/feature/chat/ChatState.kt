@@ -22,6 +22,11 @@ data class ChatState(
     val isVoiceChat: Boolean = false,  // true = full ASR->LLM->TTS pipeline
     val useLocalAsr: Boolean = false,
     val localAsrAvailable: Boolean = false,
+    val streamingAsrAvailable: Boolean = false,
+    /** Partial recognition text from the streaming ASR session (updated in real-time). */
+    val partialAsrText: String = "",
+    /** Server status text during voice chat WebSocket (e.g. “thinking”), cleared when final audio arrives. */
+    val voiceChatInterimText: String? = null,
     val selectedPage: AppPage = AppPage.VOICECHAT,
     val settingsScreenVisible: Boolean = false,
     /** When set, [LlmChatBody] scrolls to this message then clears (sidebar history tap). */

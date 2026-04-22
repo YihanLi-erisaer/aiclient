@@ -28,10 +28,27 @@ actual class PlatformVoiceChatRecorder {
     private val frameBytes = FrameSize.FRAME_SIZE_320.value * 2
 
     private val running = AtomicBoolean(false)
+    private val paused = AtomicBoolean(false)
     private var worker: Thread? = null
     private var audioRecord: AudioRecord? = null
 
     actual fun start(scope: CoroutineScope, onUtteranceWav: suspend (ByteArray) -> Unit) {
+        startInternal(scope, onUtteranceWav, onAudioFrame = null)
+    }
+
+    actual fun startWithFrameCallback(
+        scope: CoroutineScope,
+        onUtteranceWav: suspend (ByteArray) -> Unit,
+        onAudioFrame: (FloatArray) -> Unit,
+    ) {
+        startInternal(scope, onUtteranceWav, onAudioFrame)
+    }
+
+    private fun startInternal(
+        scope: CoroutineScope,
+        onUtteranceWav: suspend (ByteArray) -> Unit,
+        onAudioFrame: ((FloatArray) -> Unit)?,
+    ) {
         if (!running.compareAndSet(false, true)) return
 
         val appContext = getAppContext() as? Context
@@ -46,9 +63,9 @@ actual class PlatformVoiceChatRecorder {
         val vadInstance = VadWebRTC(
             SampleRate.SAMPLE_RATE_16K,
             FrameSize.FRAME_SIZE_320,
-            Mode.VERY_AGGRESSIVE,
-            300,
-            20
+            Mode.NORMAL,
+            200,
+            800
         )
 
         val minBuffer = AudioRecord.getMinBufferSize(pcmSampleRate, channelConfig, audioFormat)
@@ -82,6 +99,11 @@ actual class PlatformVoiceChatRecorder {
                     while (running.get()) {
                         val n = recorder.read(readBuf, 0, readBuf.size)
                         if (n <= 0) continue
+                        if (paused.get()) {
+                            utterance.reset()
+                            carry.reset()
+                            continue
+                        }
                         carry.write(readBuf, 0, n)
                         val blob = carry.toByteArray()
                         carry.reset()
@@ -89,6 +111,11 @@ actual class PlatformVoiceChatRecorder {
                         while (offset + frameBytes <= blob.size) {
                             val frame = blob.copyOfRange(offset, offset + frameBytes)
                             offset += frameBytes
+
+                            if (onAudioFrame != null) {
+                                onAudioFrame(pcm16LeToFloat(frame))
+                            }
+
                             if (vadInstance.isSpeech(frame)) {
                                 utterance.write(frame)
                             } else if (utterance.size() > 0) {
@@ -123,6 +150,27 @@ actual class PlatformVoiceChatRecorder {
             },
             "VoiceChatVadRecorder"
         ).also { it.start() }
+    }
+
+    private fun pcm16LeToFloat(pcm: ByteArray): FloatArray {
+        val samples = pcm.size / 2
+        val out = FloatArray(samples)
+        for (i in 0 until samples) {
+            val lo = pcm[i * 2].toInt() and 0xFF
+            val hi = pcm[i * 2 + 1].toInt() and 0xFF
+            var s = lo or (hi shl 8)
+            if (s >= 0x8000) s -= 0x10000
+            out[i] = s / 32768f
+        }
+        return out
+    }
+
+    actual fun pause() {
+        paused.set(true)
+    }
+
+    actual fun resume() {
+        paused.set(false)
     }
 
     actual suspend fun stop() = withContext(Dispatchers.IO) {

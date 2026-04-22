@@ -289,14 +289,15 @@ class KtorAiApi(
         wsUrl: String,
         fileBytes: ByteArray,
         fileName: String,
-        memoryId: String?
+        memoryId: String?,
+        onInterimText: ((String) -> Unit)?,
     ): Result<ByteArray> {
         return runCatching {
             val url = wsUrl.trim()
             logger.i {
                 "ASR_LLM_TTS WebSocket -> $url, bytes=${fileBytes.size}, file=$fileName"
             }
-            val textChunks = mutableListOf<String>()
+            val mergeTextChunks = mutableListOf<String>()
             val binaryChunks = mutableListOf<ByteArray>()
             var closeCode: Int? = null
             var closeReason: String? = null
@@ -320,16 +321,41 @@ class KtorAiApi(
                     try {
                         while (true) {
                             when (val frame = incoming.receive()) {
-                                is Frame.Binary -> binaryChunks.add(frame.readBytes())
+                                is Frame.Binary -> {
+                                    val raw = frame.readBytes()
+                                    val interim = tryVoiceChatInterimFromBinaryChunk(raw)
+                                    if (interim != null) {
+                                        onInterimText?.invoke(interim)
+                                        logger.d {
+                                            "ASR_LLM_TTS WebSocket interim from Binary UTF-8 (${interim.length} chars)"
+                                        }
+                                    } else {
+                                        binaryChunks.add(raw)
+                                    }
+                                }
                                 is Frame.Text -> {
                                     val t = frame.readText()
-                                    if (t.trim() == VOICE_CHAT_WS_DONE_MARKER) {
+                                    val trimmed = t.trim()
+                                    if (trimmed == VOICE_CHAT_WS_DONE_MARKER) {
                                         logger.d {
                                             "ASR_LLM_TTS WebSocket received Text [DONE] — WAV transfer complete"
                                         }
                                         break
                                     }
-                                    textChunks.add(t)
+                                    if (trimmed.startsWith("ERROR:", ignoreCase = true)) {
+                                        logger.e { "ASR_LLM_TTS WebSocket server error: $t" }
+                                        break
+                                    }
+                                    when {
+                                        trimmed.startsWith("{") -> {
+                                            if (isVoiceChatAudioMetaJson(t)) {
+                                                mergeTextChunks.add(t)
+                                            } else {
+                                                extractVoiceChatInterimDisplayText(t)?.let { onInterimText?.invoke(it) }
+                                            }
+                                        }
+                                        trimmed.isNotEmpty() -> onInterimText?.invoke(t)
+                                    }
                                 }
                                 is Frame.Ping -> send(Frame.Pong(frame.readBytes()))
                                 is Frame.Close -> {
@@ -364,9 +390,13 @@ class KtorAiApi(
                 )
             }
             logger.i {
-                "ASR_LLM_TTS WebSocket merged textFrames=${textChunks.size}, binFrames=${binaryChunks.size}"
+                "ASR_LLM_TTS WebSocket merged textFrames=${mergeTextChunks.size}, binFrames=${binaryChunks.size}"
             }
-            val merged = mergeWsResponse(textChunks, binaryChunks)
+            val merged = if (mergeTextChunks.isEmpty()) {
+                binaryChunks.fold(ByteArray(0)) { acc, b -> acc + b }
+            } else {
+                mergeWsResponse(mergeTextChunks, binaryChunks)
+            }
             logger.i { "ASR_LLM_TTS WebSocket merged bytes=${merged.size}" }
             if (merged.isEmpty()) {
                 logger.e { "ASR_LLM_TTS WebSocket merged payload is empty (no audio bytes)." }
@@ -374,6 +404,112 @@ class KtorAiApi(
             }
             merged
         }.onFailure { logger.e { "ASR_LLM_TTS WebSocket failed: ${it.message}" } }
+    }
+
+    override suspend fun textLlmTtsChatWebSocket(
+        wsUrl: String,
+        text: String,
+        memoryId: String?,
+        onInterimText: ((String) -> Unit)?,
+    ): Result<ByteArray> {
+        return runCatching {
+            val url = buildString {
+                append(wsUrl.trim())
+                if (!memoryId.isNullOrBlank()) {
+                    append(if ('?' in wsUrl) "&" else "?")
+                    append("memoryId=$memoryId")
+                }
+            }
+            logger.i { "Text LLM_TTS WebSocket -> $url, textLength=${text.length}" }
+            val mergeTextChunks = mutableListOf<String>()
+            val binaryChunks = mutableListOf<ByteArray>()
+            var closeCode: Int? = null
+            var closeReason: String? = null
+            withTimeout(120_000L) {
+                client.webSocket(urlString = url) {
+                    send(Frame.Text(text))
+                    send(Frame.Text("END"))
+                    logger.i { "Text LLM_TTS WebSocket sent text (${text.length} chars) then Text END" }
+                    try {
+                        while (true) {
+                            when (val frame = incoming.receive()) {
+                                is Frame.Binary -> {
+                                    val raw = frame.readBytes()
+                                    val interim = tryVoiceChatInterimFromBinaryChunk(raw)
+                                    if (interim != null) {
+                                        onInterimText?.invoke(interim)
+                                        logger.d {
+                                            "Text LLM_TTS WebSocket interim from Binary UTF-8 (${interim.length} chars)"
+                                        }
+                                    } else {
+                                        binaryChunks.add(raw)
+                                    }
+                                }
+                                is Frame.Text -> {
+                                    val t = frame.readText()
+                                    val trimmed = t.trim()
+                                    if (trimmed == VOICE_CHAT_WS_DONE_MARKER) {
+                                        logger.d { "Text LLM_TTS WebSocket received [DONE]" }
+                                        break
+                                    }
+                                    if (trimmed.startsWith("ERROR:", ignoreCase = true)) {
+                                        logger.e { "Text LLM_TTS WebSocket server error: $t" }
+                                        break
+                                    }
+                                    when {
+                                        trimmed.startsWith("{") -> {
+                                            if (isVoiceChatAudioMetaJson(t)) {
+                                                mergeTextChunks.add(t)
+                                            } else {
+                                                extractVoiceChatInterimDisplayText(t)?.let { onInterimText?.invoke(it) }
+                                            }
+                                        }
+                                        trimmed.isNotEmpty() -> onInterimText?.invoke(t)
+                                    }
+                                }
+                                is Frame.Ping -> send(Frame.Pong(frame.readBytes()))
+                                is Frame.Close -> {
+                                    val payload = frame.readBytes()
+                                    if (payload.size >= 2) {
+                                        closeCode =
+                                            ((payload[0].toInt() and 0xFF) shl 8) or (payload[1].toInt() and 0xFF)
+                                    }
+                                    if (payload.size > 2) {
+                                        closeReason = payload.decodeToString(2, payload.size)
+                                    }
+                                    break
+                                }
+                                else -> {}
+                            }
+                        }
+                    } catch (e: ClosedReceiveChannelException) {
+                        logger.d { "Text LLM_TTS WebSocket incoming closed: ${e.message}" }
+                    }
+                }
+            }
+            if (binaryChunks.isEmpty()) {
+                val detail = buildString {
+                    append("no Binary (WAV) frames")
+                    if (closeCode != null) append("; close code=").append(closeCode)
+                    if (!closeReason.isNullOrBlank()) append(" reason=").append(closeReason)
+                }
+                logger.e { "Text LLM_TTS WebSocket no WAV data: $detail" }
+                throw IllegalStateException(
+                    "WebSocket text chat returned no WAV data ($detail). " +
+                        "Expect Binary chunks then optional Text \"[DONE]\"."
+                )
+            }
+            val merged = if (mergeTextChunks.isEmpty()) {
+                binaryChunks.fold(ByteArray(0)) { acc, b -> acc + b }
+            } else {
+                mergeWsResponse(mergeTextChunks, binaryChunks)
+            }
+            logger.i { "Text LLM_TTS WebSocket merged binFrames=${binaryChunks.size}, bytes=${merged.size}" }
+            if (merged.isEmpty()) {
+                throw IllegalStateException("WebSocket text chat returned empty audio.")
+            }
+            merged
+        }.onFailure { logger.e { "Text LLM_TTS WebSocket failed: ${it.message}" } }
     }
 
     override suspend fun checkVoiceChatWebSocketHandshake(wsUrl: String): Result<String> {
@@ -632,6 +768,64 @@ class KtorAiApi(
                 resp.message ?: resp.content ?: resp.response ?: resp.text ?: body
             }
         }.getOrElse { body }
+    }
+
+    /** True when JSON line is the legacy `audio_meta` prefix merged before PCM/WAV bytes. */
+    private fun isVoiceChatAudioMetaJson(text: String): Boolean =
+        runCatching {
+            Json.parseToJsonElement(text.trim()).jsonObject["type"]?.jsonPrimitive?.content == "audio_meta"
+        }.getOrDefault(false)
+
+    /**
+     * Human-readable interim/status for the voice-chat UI (plain text or JSON with message/text/content/…).
+     * Not used for `audio_meta` lines (handled separately).
+     */
+    private fun extractVoiceChatInterimDisplayText(text: String): String? {
+        val trim = text.trim()
+        if (trim.isEmpty()) return null
+        if (!trim.startsWith("{")) return trim
+        return runCatching {
+            val root = Json.parseToJsonElement(trim).jsonObject
+            val keys = listOf("message", "text", "content", "status", "hint", "thinking", "msg", "tip", "description")
+            for (k in keys) {
+                val s = root[k]?.jsonPrimitive?.content?.trim() ?: continue
+                if (s.isNotEmpty()) return s
+            }
+            root["data"]?.jsonObject?.let { d ->
+                for (k in listOf("message", "text", "content")) {
+                    val s = d[k]?.jsonPrimitive?.content?.trim()
+                    if (!s.isNullOrEmpty()) return s
+                }
+            }
+            null
+        }.getOrNull()
+    }
+
+    /**
+     * Some servers send status strings as Binary (UTF-8) instead of Text. Real WAV chunks start with "RIFF".
+     */
+    private fun tryVoiceChatInterimFromBinaryChunk(bytes: ByteArray): String? {
+        if (bytes.isEmpty()) return null
+        if (bytes.size >= 4 &&
+            bytes[0] == 'R'.code.toByte() &&
+            bytes[1] == 'I'.code.toByte() &&
+            bytes[2] == 'F'.code.toByte() &&
+            bytes[3] == 'F'.code.toByte()
+        ) {
+            return null
+        }
+        if (bytes.size > 8192) return null
+        val decoded = runCatching { bytes.decodeToString() }.getOrNull() ?: return null
+        if ('\uFFFD' in decoded) return null
+        val t = decoded.trim()
+        if (t.isEmpty()) return null
+        if (t.startsWith("{")) {
+            if (isVoiceChatAudioMetaJson(t)) return null
+            return extractVoiceChatInterimDisplayText(t)
+        }
+        val bad = t.count { ch -> ch.isISOControl() && ch !in "\n\r\t" }
+        if (bad > t.length.coerceAtLeast(1) / 5) return null
+        return if (t.length <= 4096) t else null
     }
 
     private companion object {

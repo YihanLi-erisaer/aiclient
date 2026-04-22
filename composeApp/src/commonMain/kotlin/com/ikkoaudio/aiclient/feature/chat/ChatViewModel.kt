@@ -1,5 +1,6 @@
 package com.ikkoaudio.aiclient.feature.chat
 
+import com.ikkoaudio.aiclient.asr.StreamingAsrSession
 import com.ikkoaudio.aiclient.data.repository.AiRepository
 import com.ikkoaudio.aiclient.core.audio.AudioPlayer
 import com.ikkoaudio.aiclient.core.audio.AudioRecorder
@@ -36,9 +37,15 @@ class ChatViewModel(
 
     private var streamJob: Job? = null
     private val voiceChatSendMutex = Mutex()
+    private var streamingSession: StreamingAsrSession? = null
 
     init {
-        _state.update { it.copy(localAsrAvailable = repository.isLocalAsrAvailable) }
+        _state.update {
+            it.copy(
+                localAsrAvailable = repository.isLocalAsrAvailable,
+                streamingAsrAvailable = repository.isStreamingAsrAvailable,
+            )
+        }
         scope.launch {
             settingsStore.getApiBaseUrl().collect { url ->
                 _state.update { it.copy(apiBaseUrl = url) }
@@ -62,6 +69,7 @@ class ChatViewModel(
             ChatIntent.StopRecording -> stopRecordingAndTranscribe()
             ChatIntent.StartVoiceChat -> startVoiceChat()
             ChatIntent.StopVoiceChat -> stopVoiceChat()
+            ChatIntent.StartAsrListening -> startAsrListening()
             ChatIntent.CheckVoiceChatWebSocketHandshake -> checkVoiceChatWebSocketHandshake()
             ChatIntent.ToggleLocalAsr -> _state.update { it.copy(useLocalAsr = !it.useLocalAsr) }
             ChatIntent.TextToSpeech -> textToSpeech()
@@ -230,47 +238,113 @@ class ChatViewModel(
         _state.update { it.copy(isRecording = true, isVoiceChat = false) }
     }
 
+    /**
+     * Continuous ASR: VAD-based microphone capture with local transcription.
+     * Each utterance detected by VAD is transcribed (locally or via backend)
+     * and appended to [ChatState.outputText].
+     */
+    private fun startAsrListening() {
+        if (_state.value.isRecording) return
+        voiceChatRecorder.start(scope) { wav -> asrTranscribeUtterance(wav) }
+        _state.update { it.copy(isRecording = true, isVoiceChat = true, error = null) }
+    }
+
+    private suspend fun asrTranscribeUtterance(wavBytes: ByteArray) {
+        if (wavBytes.isEmpty()) return
+        _state.update { it.copy(isLoading = true) }
+        val result = repository.transcribeAudio(_state.value.apiBaseUrl, wavBytes, "recording.wav")
+        result.onSuccess { text ->
+            if (text.isNotBlank()) {
+                logger.i { "ASR listening transcribed: $text" }
+                _state.update {
+                    val separator = if (it.outputText.isNotEmpty()) "\n" else ""
+                    it.copy(outputText = it.outputText + separator + text, isLoading = false)
+                }
+            } else {
+                _state.update { it.copy(isLoading = false) }
+            }
+        }
+        result.onFailure { err ->
+            logger.e { "ASR listening transcribe failed: ${err.message}" }
+            _state.update { it.copy(error = "Transcribe failed: ${err.message}", isLoading = false) }
+        }
+    }
+
     private fun startVoiceChat() {
         if (_state.value.isRecording && _state.value.isVoiceChat) return
         val useLocalAsr = _state.value.useLocalAsr
-        voiceChatRecorder.start(scope) { wav ->
-            if (useLocalAsr) sendVoiceChatWithLocalAsr(wav)
-            else sendVoiceChatUtterance(wav)
+        val useStreaming = useLocalAsr && _state.value.streamingAsrAvailable
+
+        if (useStreaming) {
+            val session = repository.createStreamingSession()
+            if (session != null) {
+                streamingSession = session
+                voiceChatRecorder.startWithFrameCallback(
+                    scope = scope,
+                    onUtteranceWav = { _ -> sendVoiceChatWithStreamingAsr() },
+                    onAudioFrame = { samples ->
+                        session.feedSamples(samples, 16000)
+                        val partial = session.getCurrentText()
+                        _state.update { it.copy(partialAsrText = partial) }
+                    },
+                )
+            } else {
+                voiceChatRecorder.start(scope) { wav -> sendVoiceChatWithLocalAsr(wav) }
+            }
+        } else if (useLocalAsr) {
+            voiceChatRecorder.start(scope) { wav -> sendVoiceChatWithLocalAsr(wav) }
+        } else {
+            voiceChatRecorder.start(scope) { wav -> sendVoiceChatUtterance(wav) }
         }
-        _state.update { it.copy(isRecording = true, isVoiceChat = true, error = null) }
+        _state.update { it.copy(isRecording = true, isVoiceChat = true, error = null, partialAsrText = "") }
     }
 
     private suspend fun sendVoiceChatUtterance(bytes: ByteArray) {
         voiceChatSendMutex.withLock {
             if (bytes.isEmpty()) return@withLock
-            _state.update { it.copy(isLoading = true, error = null) }
+            _state.update { it.copy(isLoading = true, error = null, voiceChatInterimText = null) }
             val memoryId = ensureMemoryId()
             val wsUrl = _state.value.voiceChatWebSocketUrl
-            val combinedResult = repository.asrLlmTtsChatWebSocket(wsUrl, bytes, "recording.wav", memoryId)
+            val combinedResult = repository.asrLlmTtsChatWebSocket(
+                wsUrl,
+                bytes,
+                "recording.wav",
+                memoryId,
+                onInterimText = { t ->
+                    val s = t.trim()
+                    if (s.isNotEmpty()) scope.launch {
+                        _state.update { it.copy(voiceChatInterimText = s) }
+                    }
+                },
+            )
             combinedResult.onSuccess { audioBytes ->
                 _state.update { it.copy(isLoading = false) }
                 if (audioBytes.isEmpty()) {
-                    _state.update { it.copy(error = "Voice chat returned empty audio") }
+                    _state.update { it.copy(error = "Voice chat returned empty audio", voiceChatInterimText = null) }
                     return@onSuccess
                 }
-                audioPlayer.playPossiblyWavOrDefaultPcm(audioBytes)
+                playWithRecorderPaused(audioBytes)
             }
             combinedResult.onFailure { err ->
                 logger.e { "Voice chat failed: ${err.message}" }
                 _state.update {
-                    it.copy(error = err.message ?: "Voice chat failed", isLoading = false)
+                    it.copy(
+                        error = err.message ?: "Voice chat failed",
+                        isLoading = false,
+                        voiceChatInterimText = null,
+                    )
                 }
             }
         }
     }
 
     /**
-     * Local ASR voice chat: transcribe WAV on-device, send text to LLM, then TTS the response.
+     * Local ASR voice chat: transcribe WAV on-device, send text via WebSocket (LLM+TTS on server).
      */
     private suspend fun sendVoiceChatWithLocalAsr(wavBytes: ByteArray) {
         voiceChatSendMutex.withLock {
             if (wavBytes.isEmpty()) return@withLock
-            _state.update { it.copy(isLoading = true, error = null) }
+            _state.update { it.copy(isLoading = true, error = null, voiceChatInterimText = null) }
 
             val transcribeResult = repository.transcribeLocal(wavBytes)
             val text = transcribeResult.getOrElse { err ->
@@ -285,28 +359,85 @@ class ChatViewModel(
             }
             logger.i { "Local ASR transcribed: $text" }
 
-            val baseUrl = _state.value.apiBaseUrl
-            val memoryId = ensureMemoryId()
-            val chatResult = repository.chat(baseUrl, memoryId, text)
-            val response = chatResult.getOrElse { err ->
-                logger.e { "LLM chat failed after local ASR: ${err.message}" }
-                _state.update { it.copy(error = "LLM chat failed: ${err.message}", isLoading = false) }
+            sendTextViaWebSocket(text)
+        }
+    }
+
+    /**
+     * Streaming ASR voice chat: the OnlineRecognizer already has the text from real-time
+     * frame processing. Grab the final result, reset the session, then send text via WebSocket.
+     */
+    private suspend fun sendVoiceChatWithStreamingAsr() {
+        voiceChatSendMutex.withLock {
+            val session = streamingSession ?: return@withLock
+            val text = session.getCurrentText().trim()
+            session.reset()
+            _state.update { it.copy(partialAsrText = "") }
+
+            if (text.isBlank()) {
+                logger.i { "Streaming ASR returned blank text, skipping" }
                 return@withLock
             }
-            logger.i { "LLM response length=${response.length}" }
+            logger.i { "Streaming ASR final text: $text" }
+            _state.update { it.copy(isLoading = true, error = null, voiceChatInterimText = null) }
 
-            val ttsResult = repository.textToSpeech(baseUrl, response)
-            ttsResult.onSuccess { audioBytes ->
-                _state.update { it.copy(isLoading = false) }
-                if (audioBytes.isEmpty()) {
-                    _state.update { it.copy(error = "TTS returned empty audio") }
-                    return@onSuccess
+            sendTextViaWebSocket(text)
+        }
+    }
+
+    /**
+     * Sends recognized text to the backend through the same WebSocket used for audio voice chat.
+     * The server receives Text frames (text + "END") instead of Binary audio frames,
+     * performs LLM+TTS, and returns WAV audio.
+     * Caller must hold [voiceChatSendMutex] and must have set isLoading = true.
+     */
+    private suspend fun sendTextViaWebSocket(text: String) {
+        val memoryId = ensureMemoryId()
+        val wsUrl = _state.value.voiceChatWebSocketUrl
+        _state.update { it.copy(voiceChatInterimText = null) }
+        val result = repository.textLlmTtsChatWebSocket(
+            wsUrl,
+            text,
+            memoryId,
+            onInterimText = { t ->
+                val s = t.trim()
+                if (s.isNotEmpty()) scope.launch {
+                    _state.update { it.copy(voiceChatInterimText = s) }
                 }
-                audioPlayer.playPossiblyWavOrDefaultPcm(audioBytes)
+            },
+        )
+        result.onSuccess { audioBytes ->
+            _state.update { it.copy(isLoading = false) }
+            if (audioBytes.isEmpty()) {
+                _state.update { it.copy(error = "Voice chat returned empty audio", voiceChatInterimText = null) }
+                return@onSuccess
             }
-            ttsResult.onFailure { err ->
-                logger.e { "TTS failed after local ASR: ${err.message}" }
-                _state.update { it.copy(error = "TTS failed: ${err.message}", isLoading = false) }
+            playWithRecorderPaused(audioBytes)
+        }
+        result.onFailure { err ->
+            logger.e { "Text WebSocket voice chat failed: ${err.message}" }
+            _state.update {
+                it.copy(
+                    error = err.message ?: "Voice chat failed",
+                    isLoading = false,
+                    voiceChatInterimText = null,
+                )
+            }
+        }
+    }
+
+    /**
+     * Pauses the voice chat recorder, plays the audio response, then resumes recording.
+     * This prevents the microphone from picking up the TTS playback.
+     */
+    private suspend fun playWithRecorderPaused(audioBytes: ByteArray) {
+        _state.update { it.copy(voiceChatInterimText = null) }
+        voiceChatRecorder.pause()
+        try {
+            audioPlayer.playPossiblyWavOrDefaultPcm(audioBytes)
+        } finally {
+            if (_state.value.isVoiceChat) {
+                voiceChatRecorder.resume()
             }
         }
     }
@@ -314,7 +445,9 @@ class ChatViewModel(
     private fun stopVoiceChat() {
         scope.launch {
             voiceChatRecorder.stop()
-            _state.update { it.copy(isRecording = false) }
+            streamingSession?.release()
+            streamingSession = null
+            _state.update { it.copy(isRecording = false, partialAsrText = "", voiceChatInterimText = null) }
         }
     }
 

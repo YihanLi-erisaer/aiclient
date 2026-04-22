@@ -26,7 +26,21 @@ interface AiApi {
     suspend fun asrLlmTtsChat(baseUrl: String, fileBytes: ByteArray, fileName: String, memoryId: String?): Result<PcmPlayback>
 
     /** Voice chat: send recorded audio over WebSocket; response is WAV (same as HTTP TTS) or raw audio bytes. */
-    suspend fun asrLlmTtsChatWebSocket(wsUrl: String, fileBytes: ByteArray, fileName: String, memoryId: String?): Result<ByteArray>
+    suspend fun asrLlmTtsChatWebSocket(
+        wsUrl: String,
+        fileBytes: ByteArray,
+        fileName: String,
+        memoryId: String?,
+        onInterimText: ((String) -> Unit)? = null,
+    ): Result<ByteArray>
+
+    /** Voice chat with local ASR: send transcribed text over WebSocket (Text frame + "END"); server does LLM+TTS, returns WAV. */
+    suspend fun textLlmTtsChatWebSocket(
+        wsUrl: String,
+        text: String,
+        memoryId: String?,
+        onInterimText: ((String) -> Unit)? = null,
+    ): Result<ByteArray>
 
     /**
      * Opens a WebSocket, verifies HTTP 101 upgrade, then closes. Does not send app payload.

@@ -66,7 +66,7 @@ fun AsrCenterPanel(state: ChatState, viewModel: ChatViewModel, modifier: Modifie
                         viewModel.dispatch(ChatIntent.StopRecording)
                     } else {
                         requestRecordPermissionIfNeeded { granted ->
-                            if (granted) viewModel.dispatch(ChatIntent.StartRecording)
+                            if (granted) viewModel.dispatch(ChatIntent.StartAsrListening)
                             else viewModel.dispatch(ChatIntent.SetError("Microphone permission is required for recording"))
                         }
                     }
@@ -88,7 +88,8 @@ fun AsrCenterPanel(state: ChatState, viewModel: ChatViewModel, modifier: Modifie
             }
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                "Tap to record. Audio will be transcribed to text.",
+                "Keeps the microphone open. When VAD detects the end of a phrase, " +
+                    "it is transcribed and appended to the output. Tap Stop when done.",
                 style = MaterialTheme.typography.bodyMedium
             )
         }
@@ -126,7 +127,7 @@ fun AsrPage(state: ChatState, viewModel: ChatViewModel) {
                         viewModel.dispatch(ChatIntent.StopRecording)
                     } else {
                         requestRecordPermissionIfNeeded { granted ->
-                            if (granted) viewModel.dispatch(ChatIntent.StartVoiceChat)
+                            if (granted) viewModel.dispatch(ChatIntent.StartAsrListening)
                             else viewModel.dispatch(ChatIntent.SetError("Microphone permission is required for recording"))
                         }
                     }
@@ -148,7 +149,8 @@ fun AsrPage(state: ChatState, viewModel: ChatViewModel) {
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                "Tap to record. Audio will be transcribed to text.",
+                "Keeps the microphone open. When VAD detects the end of a phrase, " +
+                    "it is transcribed and appended to the output. Tap Stop when done.",
                 style = MaterialTheme.typography.bodySmall
             )
         }

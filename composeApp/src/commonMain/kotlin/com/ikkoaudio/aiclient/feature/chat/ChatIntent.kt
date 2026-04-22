@@ -10,6 +10,7 @@ sealed class ChatIntent {
     object StopRecording : ChatIntent()
     object StartVoiceChat : ChatIntent()  // Record -> ASR+LLM+TTS -> Play
     object StopVoiceChat : ChatIntent()
+    object StartAsrListening : ChatIntent()  // Continuous VAD -> local ASR -> outputText
     /** Probe [ChatState.voiceChatWebSocketUrl] for HTTP 101 WebSocket handshake. */
     object CheckVoiceChatWebSocketHandshake : ChatIntent()
     object ToggleLocalAsr : ChatIntent()

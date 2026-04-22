@@ -3,6 +3,7 @@ package com.ikkoaudio.aiclient.data.repository
 import com.ikkoaudio.aiclient.asr.LocalAsrEngine
 import com.ikkoaudio.aiclient.asr.LocalAsrPreferences
 import com.ikkoaudio.aiclient.asr.LocalAsrProvider
+import com.ikkoaudio.aiclient.asr.StreamingAsrSession
 import com.ikkoaudio.aiclient.core.audio.PcmPlayback
 import com.ikkoaudio.aiclient.data.remote.api.AiApi
 import com.ikkoaudio.aiclient.domain.model.LlmModel
@@ -18,6 +19,10 @@ class AiRepository(
 ) {
 
     val isLocalAsrAvailable: Boolean get() = localAsr?.isReady == true
+
+    val isStreamingAsrAvailable: Boolean get() = localAsr?.supportsStreaming == true
+
+    fun createStreamingSession(): StreamingAsrSession? = localAsr?.createStreamingSession()
 
     suspend fun transcribeLocal(wavBytes: ByteArray): Result<String> {
         val engine = localAsr ?: return Result.failure(
@@ -70,8 +75,22 @@ class AiRepository(
     suspend fun asrLlmTtsChat(baseUrl: String, fileBytes: ByteArray, fileName: String, memoryId: String?): Result<PcmPlayback> =
         api.asrLlmTtsChat(baseUrl, fileBytes, fileName, memoryId)
 
-    suspend fun asrLlmTtsChatWebSocket(wsUrl: String, fileBytes: ByteArray, fileName: String, memoryId: String?): Result<ByteArray> =
-        api.asrLlmTtsChatWebSocket(wsUrl, fileBytes, fileName, memoryId)
+    suspend fun asrLlmTtsChatWebSocket(
+        wsUrl: String,
+        fileBytes: ByteArray,
+        fileName: String,
+        memoryId: String?,
+        onInterimText: ((String) -> Unit)? = null,
+    ): Result<ByteArray> =
+        api.asrLlmTtsChatWebSocket(wsUrl, fileBytes, fileName, memoryId, onInterimText)
+
+    suspend fun textLlmTtsChatWebSocket(
+        wsUrl: String,
+        text: String,
+        memoryId: String?,
+        onInterimText: ((String) -> Unit)? = null,
+    ): Result<ByteArray> =
+        api.textLlmTtsChatWebSocket(wsUrl, text, memoryId, onInterimText)
 
     suspend fun checkVoiceChatWebSocketHandshake(wsUrl: String): Result<String> =
         api.checkVoiceChatWebSocketHandshake(wsUrl)

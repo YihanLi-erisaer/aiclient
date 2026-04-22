@@ -10,6 +10,18 @@ actual class PlatformVoiceChatRecorder {
         println("Voice chat VAD recording is not implemented for Wasm yet.")
     }
 
+    actual fun startWithFrameCallback(
+        scope: CoroutineScope,
+        onUtteranceWav: suspend (ByteArray) -> Unit,
+        onAudioFrame: (FloatArray) -> Unit,
+    ) {
+        start(scope, onUtteranceWav)
+    }
+
+    actual fun pause() {}
+
+    actual fun resume() {}
+
     actual suspend fun stop() {
     }
 }

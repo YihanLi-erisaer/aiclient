@@ -9,17 +9,20 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.ikkoaudio.aiclient.core.permission.requestRecordPermissionIfNeeded
 
@@ -83,13 +86,62 @@ fun VoiceChatBody(state: ChatState, viewModel: ChatViewModel, modifier: Modifier
                     modifier = Modifier.padding(horizontal = 8.dp)
                 )
                 Text(
-                    if (state.localAsrAvailable) "Ready" else "Unavailable",
+                    when {
+                        !state.localAsrAvailable -> "Unavailable"
+                        state.streamingAsrAvailable -> "Streaming"
+                        else -> "Offline"
+                    },
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (state.localAsrAvailable)
-                        MaterialTheme.colorScheme.primary
-                    else
-                        MaterialTheme.colorScheme.outline
+                    color = when {
+                        !state.localAsrAvailable -> MaterialTheme.colorScheme.outline
+                        state.streamingAsrAvailable -> MaterialTheme.colorScheme.primary
+                        else -> MaterialTheme.colorScheme.tertiary
+                    }
                 )
+            }
+            if (state.partialAsrText.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = state.partialAsrText,
+                        style = MaterialTheme.typography.bodyLarge,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+            }
+            val interim = state.voiceChatInterimText
+            if (!interim.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = interim,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
             }
             Spacer(modifier = Modifier.height(12.dp))
             if (state.isLoading) {
@@ -127,14 +179,21 @@ fun VoiceChatBody(state: ChatState, viewModel: ChatViewModel, modifier: Modifier
             }
             Spacer(modifier = Modifier.height(20.dp))
             Text(
-                if (state.useLocalAsr)
-                    "Keeps the microphone open. When VAD detects the end of a phrase, " +
-                        "it is transcribed locally (sherpa-onnx), the text is sent to the LLM, " +
-                        "and the reply is spoken via TTS. Tap Stop when you are done."
-                else
-                    "Keeps the microphone open. When VAD detects the end of a phrase, " +
-                        "that audio clip is sent to the server for ASR→LLM→TTS and the reply is played. " +
-                        "Tap Stop when you are done.",
+                when {
+                    state.useLocalAsr && state.streamingAsrAvailable ->
+                        "Keeps the microphone open. Audio is recognized in real-time by the " +
+                            "streaming ASR (sherpa-onnx OnlineRecognizer). When VAD detects the " +
+                            "end of a phrase, the text is sent to the LLM and the reply is spoken " +
+                            "via TTS. Tap Stop when you are done."
+                    state.useLocalAsr ->
+                        "Keeps the microphone open. When VAD detects the end of a phrase, " +
+                            "it is transcribed locally (sherpa-onnx), the text is sent to the LLM, " +
+                            "and the reply is spoken via TTS. Tap Stop when you are done."
+                    else ->
+                        "Keeps the microphone open. When VAD detects the end of a phrase, " +
+                            "that audio clip is sent to the server for ASR→LLM→TTS and the reply is played. " +
+                            "Tap Stop when you are done."
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(horizontal = 8.dp)
             )
