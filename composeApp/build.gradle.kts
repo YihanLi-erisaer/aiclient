@@ -112,6 +112,9 @@ kotlin {
         }
         jsMain.dependencies {
             implementation(libs.ktor.client.cio)
+            implementation(npm("sherpa-onnx", sherpaOnnxVersion))
+            // Emscripten glue in sherpa-onnx-wasm-nodejs.js calls path.posix in browser; webpack must polyfill `path`.
+            implementation(npm("path-browserify", "1.0.1"))
         }
         wasmJsMain.dependencies {
             implementation(libs.ktor.client.cio)

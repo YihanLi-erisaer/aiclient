@@ -20,10 +20,18 @@ actual class PlatformVoiceChatRecorder {
         onUtteranceWav: suspend (ByteArray) -> Unit,
         onAudioFrame: (FloatArray) -> Unit,
     ) {
-        start(scope, onUtteranceWav)
+        startInternal(scope, onUtteranceWav, onAudioFrame)
     }
 
     actual fun start(scope: CoroutineScope, onUtteranceWav: suspend (ByteArray) -> Unit) {
+        startInternal(scope, onUtteranceWav, onAudioFrame = null)
+    }
+
+    private fun startInternal(
+        scope: CoroutineScope,
+        onUtteranceWav: suspend (ByteArray) -> Unit,
+        onAudioFrame: ((FloatArray) -> Unit)?,
+    ) {
         if (running) return
         running = true
         val md = js("typeof navigator !== 'undefined' ? navigator.mediaDevices : null")
@@ -73,6 +81,13 @@ actual class PlatformVoiceChatRecorder {
                 proc.onaudioprocess = { ev: dynamic ->
                     if (running && !paused) {
                         val input = ev.inputBuffer.getChannelData(0)
+                        if (onAudioFrame != null) {
+                            val floats = jsFloatChannelToFloatArray(input)
+                            val at16k =
+                                if (sampleRate == TARGET_EXPORT_RATE) floats
+                                else downsampleFloatMono(floats, sampleRate, TARGET_EXPORT_RATE)
+                            onAudioFrame(at16k)
+                        }
                         val pcmChunk = floatsToPcm16LeMono(input)
                         carry = carry + pcmChunk
                         var offset = 0
@@ -136,6 +151,45 @@ actual class PlatformVoiceChatRecorder {
     private companion object {
         const val TARGET_EXPORT_RATE = 16_000
     }
+}
+
+private fun jsFloatChannelToFloatArray(channel: dynamic): FloatArray {
+    val len = js("channel.length") as Int
+    if (len <= 0) return FloatArray(0)
+    val d = channel.asDynamic()
+    val out = FloatArray(len)
+    var i = 0
+    while (i < len) {
+        out[i] = d[i].unsafeCast<Double>().toFloat()
+        i++
+    }
+    return out
+}
+
+/** Same averaging strategy as sherpa wasm demo `downsampleBuffer` (mic rate → 16 kHz). */
+private fun downsampleFloatMono(buffer: FloatArray, recordSampleRate: Int, exportSampleRate: Int): FloatArray {
+    if (recordSampleRate == exportSampleRate || buffer.isEmpty()) return buffer
+    val sampleRateRatio = recordSampleRate.toDouble() / exportSampleRate
+    val newLength = kotlin.math.max(1, kotlin.math.round(buffer.size / sampleRateRatio).toInt())
+    val result = FloatArray(newLength)
+    var offsetResult = 0
+    var offsetBuffer = 0
+    while (offsetResult < result.size) {
+        val nextOffsetBuffer =
+            kotlin.math.round((offsetResult + 1) * sampleRateRatio).toInt().coerceAtMost(buffer.size)
+        var accum = 0.0
+        var count = 0
+        var i = offsetBuffer
+        while (i < nextOffsetBuffer && i < buffer.size) {
+            accum += buffer[i]
+            count++
+            i++
+        }
+        result[offsetResult] = (if (count > 0) accum / count else 0.0).toFloat()
+        offsetResult++
+        offsetBuffer = nextOffsetBuffer
+    }
+    return result
 }
 
 private fun floatsToPcm16LeMono(input: dynamic): ByteArray {

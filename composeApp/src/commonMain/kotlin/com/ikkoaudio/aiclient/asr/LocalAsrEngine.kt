@@ -1,8 +1,8 @@
 package com.ikkoaudio.aiclient.asr
 
 /**
- * Optional on-device ASR (sherpa-onnx on Android).
- * JS/Wasm targets do not ship an engine; [LocalAsrProvider.get] returns null there.
+ * Optional on-device ASR (sherpa-onnx on Android and Kotlin/JS browser via npm + WASM).
+ * Wasm browser target may still omit an engine; see [LocalAsrProvider] per platform.
  */
 interface LocalAsrEngine {
     /** True when a model is loaded and [transcribeWav] can be attempted. */
@@ -10,6 +10,12 @@ interface LocalAsrEngine {
 
     /** True when an online (streaming) recognizer is available for real-time partial results. */
     val supportsStreaming: Boolean get() = false
+
+    /**
+     * Load models / WASM (browser). No-op on Android where init is synchronous in the engine constructor.
+     * Call from a coroutine before relying on [isReady] (e.g. repository warmup).
+     */
+    suspend fun prepare() {}
 
     /**
      * Transcribe a WAV container (same bytes as from the recorder).

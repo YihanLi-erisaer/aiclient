@@ -64,7 +64,7 @@ actual class PlatformVoiceChatRecorder {
             SampleRate.SAMPLE_RATE_16K,
             FrameSize.FRAME_SIZE_320,
             Mode.NORMAL,
-            200,
+            600,
             300
         )
 

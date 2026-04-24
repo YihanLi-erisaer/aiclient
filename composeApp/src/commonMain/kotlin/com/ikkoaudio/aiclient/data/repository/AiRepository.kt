@@ -22,6 +22,10 @@ class AiRepository(
 
     val isStreamingAsrAvailable: Boolean get() = localAsr?.supportsStreaming == true
 
+    suspend fun prepareLocalAsrIfPresent() {
+        localAsr?.prepare()
+    }
+
     fun createStreamingSession(): StreamingAsrSession? = localAsr?.createStreamingSession()
 
     suspend fun transcribeLocal(wavBytes: ByteArray): Result<String> {

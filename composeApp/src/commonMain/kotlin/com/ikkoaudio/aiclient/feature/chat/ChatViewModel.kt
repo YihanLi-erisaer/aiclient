@@ -47,6 +47,15 @@ class ChatViewModel(
             )
         }
         scope.launch {
+            repository.prepareLocalAsrIfPresent()
+            _state.update {
+                it.copy(
+                    localAsrAvailable = repository.isLocalAsrAvailable,
+                    streamingAsrAvailable = repository.isStreamingAsrAvailable,
+                )
+            }
+        }
+        scope.launch {
             settingsStore.getApiBaseUrl().collect { url ->
                 _state.update { it.copy(apiBaseUrl = url) }
             }
