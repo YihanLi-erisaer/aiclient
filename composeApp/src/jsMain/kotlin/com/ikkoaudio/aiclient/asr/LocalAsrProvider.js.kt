@@ -1,12 +1,5 @@
-package com.ikkoaudio.aiclient.asr
-
-private var cached: LocalAsrEngine? = null
+﻿package com.ikkoaudio.aiclient.asr
 
 actual object LocalAsrProvider {
-    actual fun get(): LocalAsrEngine? {
-        if (cached == null) {
-            cached = JsSherpaOnnxLocalAsrEngine()
-        }
-        return cached
-    }
+    actual fun get(): LocalAsrEngine? = null
 }

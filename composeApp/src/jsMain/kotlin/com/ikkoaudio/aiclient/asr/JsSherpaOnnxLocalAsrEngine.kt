@@ -1,4 +1,4 @@
-package com.ikkoaudio.aiclient.asr
+﻿package com.ikkoaudio.aiclient.asr
 
 import com.ikkoaudio.aiclient.core.audio.WavPcmExtractor
 import com.ikkoaudio.aiclient.core.audio.pcmBytesPerFrame
@@ -11,20 +11,13 @@ import org.khronos.webgl.Float32Array
 import org.w3c.fetch.RequestInit
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
-import kotlin.js.JsModule
-import kotlin.js.JsNonModule
+import kotlin.js.Promise
 
 /**
- * Browser local ASR using the same [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) stack as Android
- * (npm package + WebAssembly), with models served as static files (default base `models/sherpa-asr/`,
- * same layout as Android `assets/models/sherpa-asr/`).
+ * Browser local ASR using sherpa-onnx wasm browser package.
  *
- * Optional override: set `window.__SHERPA_MODEL_BASE__` to a URL prefix (no trailing slash), e.g.
- * `"https://cdn.example.com/my-asr"`.
- *
- * ONNX + WASM files must be fetchable from the browser (same origin or CORS). If the app fails to load
- * `sherpa-onnx-wasm-nodejs.wasm` at runtime, copy that file from `node_modules/sherpa-onnx/` (after a JS build)
- * next to the deployed `composeApp.js` so Emscripten’s `locateFile` can resolve it.
+ * Models are loaded from `models/sherpa-asr/` by default (same layout as Android assets),
+ * and can be overridden via `window.__SHERPA_MODEL_BASE__`.
  */
 class JsSherpaOnnxLocalAsrEngine : LocalAsrEngine {
 
@@ -36,7 +29,6 @@ class JsSherpaOnnxLocalAsrEngine : LocalAsrEngine {
     private var onlineRecognizer: dynamic = null
 
     override val isReady: Boolean get() = offlineRecognizer != null
-
     override val supportsStreaming: Boolean get() = onlineRecognizer != null
 
     override suspend fun prepare() {
@@ -46,9 +38,21 @@ class JsSherpaOnnxLocalAsrEngine : LocalAsrEngine {
             withContext(Dispatchers.Default) {
                 val base = modelBasePrefix()
                 val layout = resolveModelLayout(base) ?: return@withContext
-                offlineRecognizer = SherpaOnnxNpm.createOfflineRecognizer(buildOfflineRecognizerConfig(layout, base))
+                val pkg = awaitPromise<dynamic>(js("import('@sherpa-onnx-wasm/asr')").unsafeCast<Promise<dynamic>>())
+                val moduleFactory = pkg.AsrModule.default
+                val wasmModule = awaitPromise<dynamic>(moduleFactory(js("({})")).unsafeCast<Promise<dynamic>>())
+
+                val offlineCfg = buildOfflineRecognizerConfig(layout, base)
+                val onlineCfg = buildOnlineRecognizerConfig(layout, base)
+
+                // new OfflineRecognizer(config, module)
+                offlineRecognizer = js("(function(Ctor, cfg, mod){ return new Ctor(cfg, mod); })")(
+                    pkg.OfflineRecognizer,
+                    offlineCfg,
+                    wasmModule,
+                )
                 onlineRecognizer = runCatching {
-                    SherpaOnnxNpm.createOnlineRecognizer(buildOnlineRecognizerConfig(layout, base))
+                    pkg.createOnlineRecognizer(wasmModule, onlineCfg)
                 }.getOrNull()
             }
         }
@@ -142,7 +146,6 @@ class JsSherpaOnnxLocalAsrEngine : LocalAsrEngine {
         )
     }
 
-    /** HEAD first (cheap); fall back to GET for hosts that do not implement HEAD (small files only). */
     private suspend fun fetchResourceExists(url: String): Boolean {
         if (fetchHeadOk(url)) return true
         return suspendCoroutine { cont ->
@@ -283,11 +286,11 @@ class JsSherpaOnnxLocalAsrEngine : LocalAsrEngine {
     }
 }
 
-@JsModule("sherpa-onnx")
-@JsNonModule
-internal external object SherpaOnnxNpm {
-    fun createOfflineRecognizer(config: dynamic): dynamic
-    fun createOnlineRecognizer(config: dynamic): dynamic
+private suspend fun <T> awaitPromise(p: Promise<T>): T = suspendCoroutine { cont ->
+    p.then(
+        { v -> cont.resume(v) },
+        { e -> throw RuntimeException(e?.toString() ?: "Promise rejected") },
+    )
 }
 
 private fun sherpaOfflineText(rec: dynamic, stream: dynamic): String =
